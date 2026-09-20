@@ -9,11 +9,13 @@ import { TiltCard } from "./TiltCard";
 interface CareerRoadmapProps {
   milestones: RoadmapMilestone[];
   currentMilestoneIndex: number;
+  onOpenRoadmap?: () => void;
 }
 
 export const CareerRoadmap: React.FC<CareerRoadmapProps> = ({
   milestones,
   currentMilestoneIndex,
+  onOpenRoadmap,
 }) => {
   return (
     <TiltCard glow="accent" className="h-full">
@@ -28,13 +30,24 @@ export const CareerRoadmap: React.FC<CareerRoadmapProps> = ({
               </p>
             </div>
 
-            <Link
-              href="#full-roadmap"
-              className="inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline group/link focus-visible:outline-accent"
-            >
-              <span>View full roadmap</span>
-              <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-0.5" />
-            </Link>
+            {onOpenRoadmap ? (
+              <button
+                type="button"
+                onClick={onOpenRoadmap}
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline group/link focus-visible:outline-accent"
+              >
+                <span>View full roadmap</span>
+                <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-0.5" />
+              </button>
+            ) : (
+              <Link
+                href="#roadmap"
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline group/link focus-visible:outline-accent"
+              >
+                <span>View full roadmap</span>
+                <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover/link:translate-x-0.5" />
+              </Link>
+            )}
           </div>
 
           {/* Milestone Timeline List */}
@@ -102,13 +115,24 @@ export const CareerRoadmap: React.FC<CareerRoadmapProps> = ({
           <span className="caption text-ink-muted">
             Expected completion: Dec 2026
           </span>
-          <Link
-            href="#roadmap-details"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-transparent text-ink hover:bg-canvas hover:border-border text-[12px] font-medium transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 focus-visible:outline-accent"
-          >
-            <span>Roadmap curriculum</span>
-            <ArrowRight className="w-3.5 h-3.5 text-ink-muted transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          {onOpenRoadmap ? (
+            <button
+              type="button"
+              onClick={onOpenRoadmap}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-transparent text-ink hover:bg-canvas hover:border-border text-[12px] font-medium transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 focus-visible:outline-accent"
+            >
+              <span>Roadmap curriculum</span>
+              <ArrowRight className="w-3.5 h-3.5 text-ink-muted transition-transform group-hover:translate-x-0.5" />
+            </button>
+          ) : (
+            <Link
+              href="#roadmap"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-transparent text-ink hover:bg-canvas hover:border-border text-[12px] font-medium transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 focus-visible:outline-accent"
+            >
+              <span>Roadmap curriculum</span>
+              <ArrowRight className="w-3.5 h-3.5 text-ink-muted transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
         </div>
       </div>
     </TiltCard>

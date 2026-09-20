@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, HelpCircle, Menu, X, LogOut } from "lucide-react";
+import { Search, Bell, HelpCircle, Menu, X, LogOut, User, Settings } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { supabase } from "@/supabaseClient";
 
@@ -17,14 +17,39 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  const [onboardedProfile, setOnboardedProfile] = useState<any>(null);
+
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      if (isMounted) {
         setCurrentUser(user);
+      }
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("career_os_student_profile");
+        if (raw) {
+          try {
+            if (isMounted) setOnboardedProfile(JSON.parse(raw));
+          } catch (e) {}
+        }
       }
     };
     fetchUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isMounted) {
+        setCurrentUser(session?.user || null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -33,9 +58,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
     router.replace("/signin");
   };
 
-  const displayName = currentUser?.user_metadata?.full_name || "Alex Rivera";
-  const displayEmail = currentUser?.email || "alex.rivera@university.edu";
-  const displayPhone = currentUser?.user_metadata?.phone || "+1 (555) 234-5678";
+  const displayName =
+    onboardedProfile?.personalInfo?.fullName ||
+    currentUser?.user_metadata?.full_name ||
+    "Alex Rivera";
+  const displayEmail =
+    onboardedProfile?.personalInfo?.email ||
+    currentUser?.email ||
+    "alex.rivera@university.edu";
+  const displayPhone =
+    onboardedProfile?.personalInfo?.phone ||
+    currentUser?.user_metadata?.phone ||
+    "+1 (555) 234-5678";
+  const displaySubtitle = onboardedProfile?.careerPreferences?.primaryRole
+    ? `${onboardedProfile.careerPreferences.primaryRole} • ${onboardedProfile.personalInfo?.graduationYear || "2025"}`
+    : "Student • CS 2025";
+
   const initials = displayName
     .split(" ")
     .map((n: string) => n[0])
@@ -136,19 +174,32 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
 
         <div className="h-4 w-[1px] bg-border/80 dark:bg-zinc-800 mx-0.5 sm:mx-1" />
 
-        {/* Sign In & Sign Up Quick Navigation */}
-        <Link
-          href="/signin"
-          className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-[13px] font-semibold text-ink hover:text-accent hover:bg-canvas transition-colors focus-visible:outline-accent"
-        >
-          Sign in
-        </Link>
-        <Link
-          href="/signup"
-          className="hidden md:inline-flex items-center px-3 py-1.5 rounded-lg bg-accent text-white text-[12px] font-semibold hover:bg-accent/90 shadow-sm shadow-accent/25 transition-all focus-visible:outline-accent"
-        >
-          Sign up
-        </Link>
+        {/* Auth status buttons: Sign out if already signed in, Sign in & Sign up if logged out */}
+        {currentUser ? (
+          <button
+            onClick={handleSignOut}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors focus-visible:outline-accent cursor-pointer"
+            title="Sign out of CareerOS"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign out</span>
+          </button>
+        ) : (
+          <>
+            <Link
+              href="/signin"
+              className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-[13px] font-semibold text-ink hover:text-accent hover:bg-canvas transition-colors focus-visible:outline-accent"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="hidden md:inline-flex items-center px-3 py-1.5 rounded-lg bg-accent text-white text-[12px] font-semibold hover:bg-accent/90 shadow-sm shadow-accent/25 transition-all focus-visible:outline-accent"
+            >
+              Sign up
+            </Link>
+          </>
+        )}
 
         {/* User profile dropdown button */}
         <div className="relative">
@@ -165,8 +216,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
               <span className="text-[13px] font-semibold text-ink leading-tight truncate max-w-[120px]">
                 {displayName}
               </span>
-              <span className="text-[10px] text-ink-muted leading-tight font-medium">
-                Student • CS 2026
+              <span className="text-[10px] text-ink-muted leading-tight font-medium truncate max-w-[140px]">
+                {displaySubtitle}
               </span>
             </div>
           </button>
@@ -187,12 +238,57 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
                   <p className="text-[11px] text-ink-muted leading-tight mt-0.5 truncate">
                     {displayEmail}
                   </p>
-                  <p className="text-[11px] text-ink-muted leading-tight mt-0.5">
-                    {displayPhone}
+                  <p className="text-[11px] text-accent font-medium leading-tight mt-1 truncate">
+                    {displaySubtitle}
                   </p>
                 </div>
 
                 <div className="space-y-1 text-[13px]">
+                  <Link
+                    href="#profile"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      if (typeof window !== "undefined") {
+                        window.location.hash = "profile";
+                      }
+                    }}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-accent/10 hover:text-accent font-semibold transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="w-3.5 h-3.5 text-accent" />
+                      <span>Complete Career Profile</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold text-accent px-1.5 py-0.5 rounded bg-accent/10">
+                      View
+                    </span>
+                  </Link>
+
+                  <Link
+                    href="#settings"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      if (typeof window !== "undefined") {
+                        window.location.hash = "settings";
+                      }
+                    }}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-accent/10 hover:text-accent font-semibold transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-3.5 h-3.5 text-accent" />
+                      <span>Settings & Preferences</span>
+                    </div>
+                    <span className="text-[11px] text-ink-muted">→</span>
+                  </Link>
+
+                  <Link
+                    href="/onboarding?edit=true"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink-muted hover:text-ink hover:bg-canvas font-medium transition-colors"
+                  >
+                    <span>Onboarding Wizard</span>
+                    <span className="text-[10px] text-ink-muted">Edit →</span>
+                  </Link>
+
                   <Link
                     href="/signin"
                     onClick={() => setProfileMenuOpen(false)}

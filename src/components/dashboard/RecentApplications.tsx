@@ -8,10 +8,12 @@ import { TiltCard } from "./TiltCard";
 
 interface RecentApplicationsProps {
   applications: RecentApplication[];
+  onOpenJobTracker?: () => void;
 }
 
 export const RecentApplications: React.FC<RecentApplicationsProps> = ({
   applications,
+  onOpenJobTracker,
 }) => {
   const getStatusBadgeStyle = (status: RecentApplication["status"]) => {
     switch (status) {
@@ -40,12 +42,22 @@ export const RecentApplications: React.FC<RecentApplicationsProps> = ({
                 Last 3 submissions across your target pool
               </p>
             </div>
-            <Link
-              href="#job-tracker"
-              className="caption font-semibold text-accent hover:underline focus-visible:outline-accent"
-            >
-              All applications (16)
-            </Link>
+            {onOpenJobTracker ? (
+              <button
+                type="button"
+                onClick={onOpenJobTracker}
+                className="caption font-semibold text-accent hover:underline focus-visible:outline-accent"
+              >
+                All applications (16)
+              </button>
+            ) : (
+              <Link
+                href="#job-tracker"
+                className="caption font-semibold text-accent hover:underline focus-visible:outline-accent"
+              >
+                All applications (16)
+              </Link>
+            )}
           </div>
 
           {/* Applications List */}

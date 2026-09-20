@@ -8,9 +8,13 @@ import { TiltCard } from "./TiltCard";
 
 interface RecommendedJobsProps {
   jobs: RecommendedJob[];
+  onOpenJobTracker?: () => void;
 }
 
-export const RecommendedJobs: React.FC<RecommendedJobsProps> = ({ jobs }) => {
+export const RecommendedJobs: React.FC<RecommendedJobsProps> = ({
+  jobs,
+  onOpenJobTracker,
+}) => {
   return (
     <TiltCard glow="accent" className="h-full">
       <div className="card-base flex flex-col justify-between h-full group/card transition-all duration-300">
@@ -23,9 +27,19 @@ export const RecommendedJobs: React.FC<RecommendedJobsProps> = ({ jobs }) => {
                 Ranked by profile & skill alignment
               </p>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-semibold">
-              Top 2 matches
-            </span>
+            {onOpenJobTracker ? (
+              <button
+                type="button"
+                onClick={onOpenJobTracker}
+                className="px-2.5 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-semibold hover:bg-accent/20 transition-colors"
+              >
+                Top matches
+              </button>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[11px] font-semibold">
+                Top 2 matches
+              </span>
+            )}
           </div>
 
           {/* Job Cards */}
@@ -58,33 +72,46 @@ export const RecommendedJobs: React.FC<RecommendedJobsProps> = ({ jobs }) => {
                   </span>
                 </div>
 
-                {/* Missing skill chips */}
+                {/* Missing Skills Warning */}
                 {job.missingSkills.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-border/70 dark:border-zinc-800 flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-ink-muted font-medium">Skill gaps:</span>
-                    {job.missingSkills.map((skill) => (
-                      <span
-                        key={skill}
-                        className="px-2 py-0.5 rounded-md bg-surface border border-border/80 text-[11px] text-ink-muted font-medium hover:border-accent/40 transition-colors"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+                  <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-ink-muted">
+                    <span className="font-medium">Missing:</span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {job.missingSkills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-medium"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {/* View Job action */}
-                <div className="mt-3.5 flex items-center justify-between">
-                  <span className="text-[11px] text-ink-muted">
+                <div className="mt-3 pt-2.5 border-t border-border/80 dark:border-zinc-800 flex items-center justify-between">
+                  <span className="caption text-ink-muted">
                     Posted {job.postedDaysAgo}d ago
                   </span>
-                  <Link
-                    href={job.applyUrl}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-surface text-ink hover:bg-accent hover:text-white hover:border-accent text-[12px] font-semibold transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shadow-sm focus-visible:outline-accent"
-                  >
-                    <span>View job</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Link>
+                  {onOpenJobTracker ? (
+                    <button
+                      type="button"
+                      onClick={onOpenJobTracker}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-surface text-ink hover:bg-accent hover:text-white hover:border-accent text-[12px] font-semibold transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shadow-sm focus-visible:outline-accent"
+                    >
+                      <span>View details & match</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <Link
+                      href={job.applyUrl}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-surface text-ink hover:bg-accent hover:text-white hover:border-accent text-[12px] font-semibold transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 shadow-sm focus-visible:outline-accent"
+                    >
+                      <span>View job</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
@@ -96,12 +123,22 @@ export const RecommendedJobs: React.FC<RecommendedJobsProps> = ({ jobs }) => {
           <span className="caption text-ink-muted">
             14 new roles added this week
           </span>
-          <Link
-            href="#all-jobs"
-            className="text-[12px] font-semibold text-accent hover:underline focus-visible:outline-accent"
-          >
-            View all 14 matches →
-          </Link>
+          {onOpenJobTracker ? (
+            <button
+              type="button"
+              onClick={onOpenJobTracker}
+              className="text-[12px] font-semibold text-accent hover:underline focus-visible:outline-accent"
+            >
+              View all matched jobs →
+            </button>
+          ) : (
+            <Link
+              href="#all-jobs"
+              className="text-[12px] font-semibold text-accent hover:underline focus-visible:outline-accent"
+            >
+              View all 14 matches →
+            </Link>
+          )}
         </div>
       </div>
     </TiltCard>

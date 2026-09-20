@@ -28,6 +28,9 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showOtpBox, setShowOtpBox] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -37,6 +40,32 @@ export default function SignInPage() {
       }
     };
     checkSession();
+
+    // Cross-tab sync: if email was verified in another tab, advance this tab!
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      channel = new BroadcastChannel("career_os_auth_sync");
+      channel.onmessage = (e) => {
+        if (e.data?.type === "EMAIL_VERIFIED") {
+          channel?.postMessage({ type: "PONG_EXISTING_TAB" });
+          setSuccessMessage("Email confirmed! Redirecting in this tab...");
+          setTimeout(() => router.replace("/"), 800);
+        }
+      };
+    }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "career_os_email_verified_trigger") {
+        setSuccessMessage("Email confirmed! Redirecting in this tab...");
+        setTimeout(() => router.replace("/"), 800);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener("storage", handleStorage);
+    };
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {

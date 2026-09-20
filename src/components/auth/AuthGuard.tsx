@@ -33,6 +33,26 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
         if (isMounted) {
           setIsAuthenticated(true);
+
+          // Check if onboarding is completed
+          const metadataOnboarded = Boolean(session.user.user_metadata?.onboarding_completed);
+          let localOnboarded = false;
+          if (typeof window !== "undefined") {
+            const raw = localStorage.getItem("career_os_student_profile");
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                localOnboarded = Boolean(parsed.onboardingCompleted);
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+
+          if (!metadataOnboarded && !localOnboarded) {
+            router.replace("/onboarding");
+            return;
+          }
         }
       } catch (err) {
         if (isMounted) {
@@ -56,6 +76,19 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
       } else {
         if (isMounted) {
           setIsAuthenticated(true);
+          const metadataOnboarded = Boolean(session.user.user_metadata?.onboarding_completed);
+          let localOnboarded = false;
+          if (typeof window !== "undefined") {
+            const raw = localStorage.getItem("career_os_student_profile");
+            if (raw) {
+              try {
+                localOnboarded = Boolean(JSON.parse(raw).onboardingCompleted);
+              } catch (e) {}
+            }
+          }
+          if (!metadataOnboarded && !localOnboarded) {
+            router.replace("/onboarding");
+          }
         }
       }
     });

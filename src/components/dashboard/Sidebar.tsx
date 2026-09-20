@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Route,
@@ -21,6 +22,8 @@ import {
 interface SidebarProps {
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
+  activeSection?: string;
+  onSelectSection?: (sectionId: string) => void;
 }
 
 interface NavItem {
@@ -39,7 +42,7 @@ const navItems: NavItem[] = [
     label: "Dashboard",
     category: "Overview",
     description: "Readiness score & action items",
-    href: "/",
+    href: "#dashboard",
     icon: LayoutDashboard,
   },
   {
@@ -68,42 +71,42 @@ const navItems: NavItem[] = [
   },
   {
     id: "interview",
-    label: "Interview Prep",
+    label: "Interview Trainer",
     category: "Practice",
-    description: "System design & behavioral mocks",
+    description: "Technical & behavioral mock rounds",
     href: "#interview",
     icon: MessageSquareCode,
   },
   {
     id: "dsa",
-    label: "DSA Practice",
+    label: "DSA & Skill Trainer",
     category: "Drills",
-    description: "Daily algorithms & data structures",
+    description: "Problem sets, coding workspace & evaluations",
     href: "#dsa",
     icon: Code2,
   },
   {
     id: "learning",
-    label: "Learning Modules",
+    label: "Learning",
     category: "Curriculum",
-    description: "Microservices & database tracks",
+    description: "Recommended curriculum, interactive lessons & quizzes",
     href: "#learning",
     icon: BookOpen,
   },
   {
     id: "mentor",
-    label: "AI Mentor",
+    label: "AI Career Assistant",
     category: "AI Co-pilot",
-    description: "Intelligent coaching & daily advice",
+    description: "Interactive AI mentor grounded in your profile",
     href: "#mentor",
     icon: Sparkles,
     isAi: true,
   },
   {
     id: "progress",
-    label: "Progress Analytics",
+    label: "Progress",
     category: "Metrics",
-    description: "Rolling 30-day skill growth",
+    description: "Long-term performance center & AI trend analysis",
     href: "#progress",
     icon: TrendingUp,
   },
@@ -111,7 +114,7 @@ const navItems: NavItem[] = [
     id: "profile",
     label: "Student Profile",
     category: "Profile",
-    description: "Alex Rivera • Junior benchmark",
+    description: "Complete career profile & AI feeder",
     href: "#profile",
     icon: User,
   },
@@ -125,8 +128,31 @@ const navItems: NavItem[] = [
   },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) => {
-  const [activeId, setActiveId] = useState<string>("dashboard");
+export const Sidebar: React.FC<SidebarProps> = ({
+  mobileOpen,
+  onCloseMobile,
+  activeSection,
+  onSelectSection,
+}) => {
+  const pathname = usePathname();
+  const [internalActiveId, setInternalActiveId] = useState<string>(() => {
+    if (activeSection) return activeSection;
+    if (pathname?.startsWith("/onboarding")) return "profile";
+    return "dashboard";
+  });
+
+  const effectiveActiveId = activeSection || internalActiveId;
+
+  useEffect(() => {
+    if (activeSection) {
+      setInternalActiveId(activeSection);
+    } else if (pathname?.startsWith("/onboarding")) {
+      setInternalActiveId("profile");
+    } else if (pathname === "/") {
+      setInternalActiveId("dashboard");
+    }
+  }, [pathname, activeSection]);
+
   const [hoveredItem, setHoveredItem] = useState<{
     item: NavItem;
     top: number;
@@ -156,13 +182,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
         <nav ref={navRef} className="flex flex-col items-center gap-1.5 w-full px-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeId === item.id;
+            const isActive = effectiveActiveId === item.id;
 
             return (
               <div key={item.id} className="relative w-full flex justify-center">
                 <Link
                   href={item.href}
-                  onClick={() => setActiveId(item.id)}
+                  onClick={(e) => {
+                    setInternalActiveId(item.id);
+                    if (onSelectSection) {
+                      if (
+                        item.id === "roadmap" ||
+                        item.id === "dashboard" ||
+                        item.id === "jobs" ||
+                        item.id === "resume" ||
+                        item.id === "interview" ||
+                        item.id === "dsa" ||
+                        item.id === "learning" ||
+                        item.id === "mentor" ||
+                        item.id === "progress" ||
+                        item.id === "profile" ||
+                        item.id === "settings"
+                      ) {
+                        e.preventDefault();
+                        onSelectSection(item.id);
+                      }
+                    }
+                  }}
                   onMouseEnter={(e) => handleMouseEnter(item, e)}
                   onMouseLeave={handleMouseLeave}
                   className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 transform-gpu active:scale-95 focus-visible:outline-accent ${
@@ -267,15 +313,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
             <nav className="flex flex-col gap-1 overflow-y-auto flex-1 pr-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeId === item.id;
+                const isActive = effectiveActiveId === item.id;
 
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
-                    onClick={() => {
-                      setActiveId(item.id);
+                    onClick={(e) => {
+                      setInternalActiveId(item.id);
                       if (onCloseMobile) onCloseMobile();
+                      if (onSelectSection) {
+                        if (
+                          item.id === "roadmap" ||
+                          item.id === "dashboard" ||
+                          item.id === "jobs" ||
+                          item.id === "resume" ||
+                          item.id === "interview" ||
+                          item.id === "dsa" ||
+                          item.id === "learning" ||
+                          item.id === "mentor" ||
+                          item.id === "progress" ||
+                          item.id === "profile" ||
+                          item.id === "settings"
+                        ) {
+                          e.preventDefault();
+                          onSelectSection(item.id);
+                        }
+                      }
                     }}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] transition-all duration-150 ${
                       isActive
