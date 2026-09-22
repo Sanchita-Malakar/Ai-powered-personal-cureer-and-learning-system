@@ -48,10 +48,10 @@ An intelligent, deterministic student career acceleration platform designed to b
    npm install
    ```
 
-3. Configure Supabase in `src/supabaseClient.js`:
-   ```javascript
-   const SUPABASE_URL = "https://your-project.supabase.co";
-   const SUPABASE_PUBLIC_KEY = "your-anon-public-key";
+3. Configure Supabase in `.env.local` or [src/supabaseClient.ts](file:///d:/7th%20sem%20project/src/supabaseClient.ts):
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
    ```
 
 4. Start the development server:
@@ -59,7 +59,7 @@ An intelligent, deterministic student career acceleration platform designed to b
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) (or the active port reported by Next.js) in your browser.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
@@ -76,7 +76,7 @@ An intelligent, deterministic student career acceleration platform designed to b
 │   │   ├── auth/              # AuthLayout & AuthGuard route protection
 │   │   └── dashboard/         # Hero, Metrics, AiTodaysPlan, TiltCard, Sidebar, Navbar
 │   ├── hooks/                 # Dashboard state and logic hooks
-│   └── supabaseClient.js      # Supabase client initialization
+│   └── supabaseClient.ts      # Supabase client & local auth fallback engine
 └── ...
 ```
 

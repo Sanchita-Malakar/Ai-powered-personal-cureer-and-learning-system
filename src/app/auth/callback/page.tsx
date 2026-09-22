@@ -79,22 +79,30 @@ function CallbackContent() {
     handleAuthCallback();
 
     // Listen to Supabase auth state change as fallback
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && isMounted) {
-        setStatus("verified");
-        if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-          const channel = new BroadcastChannel("career_os_auth_sync");
-          channel.postMessage({ type: "EMAIL_VERIFIED", timestamp: Date.now() });
-        }
-        if (typeof window !== "undefined") {
-          localStorage.setItem("career_os_email_verified_trigger", Date.now().toString());
-        }
+    let unsubscribe: (() => void) | undefined;
+    if (supabase?.auth?.onAuthStateChange) {
+      try {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (session && isMounted) {
+            setStatus("verified");
+            if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+              const channel = new BroadcastChannel("career_os_auth_sync");
+              channel.postMessage({ type: "EMAIL_VERIFIED", timestamp: Date.now() });
+            }
+            if (typeof window !== "undefined") {
+              localStorage.setItem("career_os_email_verified_trigger", Date.now().toString());
+            }
+          }
+        });
+        unsubscribe = () => subscription?.unsubscribe?.();
+      } catch (e) {
+        console.error("Failed to subscribe in auth callback:", e);
       }
-    });
+    }
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, [router, searchParams]);
 

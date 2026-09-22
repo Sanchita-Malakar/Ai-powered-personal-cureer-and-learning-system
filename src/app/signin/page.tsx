@@ -28,60 +28,31 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [showOtpBox, setShowOtpBox] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        router.replace("/");
+        window.location.href = "/";
       }
     };
     checkSession();
-
-    // Cross-tab sync: if email was verified in another tab, advance this tab!
-    let channel: BroadcastChannel | null = null;
-    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-      channel = new BroadcastChannel("career_os_auth_sync");
-      channel.onmessage = (e) => {
-        if (e.data?.type === "EMAIL_VERIFIED") {
-          channel?.postMessage({ type: "PONG_EXISTING_TAB" });
-          setSuccessMessage("Email confirmed! Redirecting in this tab...");
-          setTimeout(() => router.replace("/"), 800);
-        }
-      };
-    }
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "career_os_email_verified_trigger") {
-        setSuccessMessage("Email confirmed! Redirecting in this tab...");
-        setTimeout(() => router.replace("/"), 800);
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      channel?.close();
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, [router]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
     setSuccessMessage("");
 
-    // Validation
+    // Input Validation
     if (loginMethod === "email") {
-      if (!email || !email.includes("@")) {
+      if (!email.trim() || !email.includes("@")) {
         setErrorMessage("Please enter a valid email address.");
         return;
       }
     } else {
       const digitsOnly = phone.replace(/\D/g, "");
-      if (!phone || digitsOnly.length < 10) {
+      if (!phone.trim() || digitsOnly.length < 10) {
         setErrorMessage("Please enter a valid phone number with at least 10 digits.");
         return;
       }
@@ -95,18 +66,15 @@ export default function SignInPage() {
     setIsLoading(true);
 
     try {
-      let result;
-      if (loginMethod === "email") {
-        result = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password,
-        });
-      } else {
-        result = await supabase.auth.signInWithPassword({
-          phone: phone.trim(),
-          password: password,
-        });
-      }
+      const result = await (loginMethod === "email"
+        ? supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password: password,
+          })
+        : supabase.auth.signInWithPassword({
+            phone: phone.trim(),
+            password: password,
+          }));
 
       if (result.error) {
         setErrorMessage(result.error.message || "Failed to sign in. Please verify your credentials.");
@@ -114,13 +82,13 @@ export default function SignInPage() {
         return;
       }
 
-      setSuccessMessage("Signed in successfully! Redirecting to home...");
+      setSuccessMessage("Signed in successfully! Redirecting...");
       setIsLoading(false);
 
-      // Redirect to home page
+      // Perform a full reload into the dashboard to ensure all auth tokens and profiles hydrate cleanly
       setTimeout(() => {
-        router.push("/");
-      }, 1000);
+        window.location.href = "/";
+      }, 500);
     } catch (err: any) {
       setErrorMessage(err?.message || "An unexpected error occurred during sign in.");
       setIsLoading(false);
@@ -130,7 +98,7 @@ export default function SignInPage() {
   return (
     <AuthLayout
       title="Sign in to CareerOS"
-      subtitle="Access your customized student roadmap, metrics, and AI mentor."
+      subtitle="Access your personalized student roadmap, analytics, and career mentor."
     >
       {/* Login Mode Toggle: Email vs Phone Number */}
       <div className="grid grid-cols-2 p-1 bg-canvas border border-border/80 rounded-xl mb-5 text-[13px] font-semibold">
@@ -167,7 +135,7 @@ export default function SignInPage() {
         </button>
       </div>
 
-      {/* Form */}
+      {/* Sign In Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Email or Phone Input */}
         {loginMethod === "email" ? (
@@ -181,9 +149,10 @@ export default function SignInPage() {
                 id="email-input"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="alex.rivera@university.edu"
+                placeholder="student@university.edu"
                 className="w-full bg-canvas/60 border border-border/80 text-ink placeholder:text-ink-muted/60 text-[13px] rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-accent focus:bg-surface focus:shadow-sm focus:shadow-accent/10 transition-all"
               />
             </div>
@@ -199,9 +168,10 @@ export default function SignInPage() {
                 id="phone-input"
                 type="tel"
                 required
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 (555) 234-5678"
+                placeholder="+91 98765 43210"
                 className="w-full bg-canvas/60 border border-border/80 text-ink placeholder:text-ink-muted/60 text-[13px] rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:border-accent focus:bg-surface focus:shadow-sm focus:shadow-accent/10 transition-all"
               />
             </div>
@@ -214,12 +184,6 @@ export default function SignInPage() {
             <label className="text-[13px] font-semibold text-ink" htmlFor="password-input">
               Password
             </label>
-            <Link
-              href="#forgot-password"
-              className="text-[12px] font-medium text-accent hover:underline"
-            >
-              Forgot password?
-            </Link>
           </div>
           <div className="relative">
             <Lock className="w-4 h-4 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -227,6 +191,7 @@ export default function SignInPage() {
               id="password-input"
               type={showPassword ? "text" : "password"}
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••••"
@@ -253,7 +218,7 @@ export default function SignInPage() {
             className="w-4 h-4 rounded border-border text-accent focus:ring-accent accent-accent cursor-pointer"
           />
           <label htmlFor="remember-me" className="text-[13px] text-ink-muted cursor-pointer select-none">
-            Remember me on this browser
+            Remember me on this device
           </label>
         </div>
 
@@ -277,15 +242,17 @@ export default function SignInPage() {
         </button>
       </form>
 
-      {/* Error Message Under the Form */}
+      {/* Error Message */}
       {errorMessage && (
-        <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 text-[13px] flex items-center gap-2 animate-in fade-in">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 text-[13px] flex items-start gap-2 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span>{errorMessage}</span>
+          </div>
         </div>
       )}
 
-      {/* Success Message Under the Form */}
+      {/* Success Message */}
       {successMessage && (
         <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-[13px] flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />

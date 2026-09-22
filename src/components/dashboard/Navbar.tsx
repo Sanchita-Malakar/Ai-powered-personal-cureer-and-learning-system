@@ -23,9 +23,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
     let isMounted = true;
 
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (isMounted) {
-        setCurrentUser(user);
+      try {
+        if (!supabase?.auth?.getUser) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (isMounted) {
+          setCurrentUser(user);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user in Navbar:", err);
       }
       if (typeof window !== "undefined") {
         const raw = localStorage.getItem("career_os_student_profile");
@@ -38,41 +43,49 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
     };
     fetchUser();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isMounted) {
-        setCurrentUser(session?.user || null);
+    let unsubscribe: (() => void) | undefined;
+    if (supabase?.auth?.onAuthStateChange) {
+      try {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (isMounted) {
+            setCurrentUser(session?.user || null);
+          }
+        });
+        unsubscribe = () => subscription?.unsubscribe?.();
+      } catch (e) {
+        console.error("Failed to subscribe in Navbar:", e);
       }
-    });
+    }
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, []);
 
   const handleSignOut = async () => {
     setProfileMenuOpen(false);
     await supabase.auth.signOut();
-    router.replace("/signin");
+    window.location.href = "/signin";
   };
 
   const displayName =
     onboardedProfile?.personalInfo?.fullName ||
     currentUser?.user_metadata?.full_name ||
-    "Alex Rivera";
+    "Student";
   const displayEmail =
     onboardedProfile?.personalInfo?.email ||
     currentUser?.email ||
-    "alex.rivera@university.edu";
+    "student@university.edu";
   const displayPhone =
     onboardedProfile?.personalInfo?.phone ||
     currentUser?.user_metadata?.phone ||
-    "+1 (555) 234-5678";
+    "";
   const displaySubtitle = onboardedProfile?.careerPreferences?.primaryRole
-    ? `${onboardedProfile.careerPreferences.primaryRole} • ${onboardedProfile.personalInfo?.graduationYear || "2025"}`
-    : "Student • CS 2025";
+    ? `${onboardedProfile.careerPreferences.primaryRole}`
+    : "CareerOS Student";
 
   const initials = displayName
     .split(" ")

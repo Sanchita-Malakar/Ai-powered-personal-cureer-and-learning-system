@@ -103,35 +103,46 @@ export default function SignUpPage() {
     window.addEventListener("storage", handleStorage);
 
     // 3. Supabase Auth state change listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && isMounted) {
-        setSuccessMessage("Email verified! Continuing to onboarding in this tab...");
-        setTimeout(() => {
-          router.push("/onboarding");
-        }, 800);
+    let unsubscribe: (() => void) | undefined;
+    if (supabase?.auth?.onAuthStateChange) {
+      try {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((event, session) => {
+          if (session && isMounted) {
+            setSuccessMessage("Email verified! Continuing to onboarding in this tab...");
+            setTimeout(() => {
+              router.push("/onboarding");
+            }, 800);
+          }
+        });
+        unsubscribe = () => subscription?.unsubscribe?.();
+      } catch (subErr) {
+        console.error("Failed to subscribe in SignUp:", subErr);
       }
-    });
+    }
 
     // 4. Polling check every 2.5s in case link was opened on another window or device
     const pollInterval = setInterval(async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session && isMounted) {
-        setSuccessMessage("Email verified! Continuing to onboarding in this tab...");
-        setTimeout(() => {
-          router.push("/onboarding");
-        }, 800);
-      }
+      try {
+        if (!supabase?.auth?.getSession) return;
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session && isMounted) {
+          setSuccessMessage("Email verified! Continuing to onboarding in this tab...");
+          setTimeout(() => {
+            router.push("/onboarding");
+          }, 800);
+        }
+      } catch (pollErr) {}
     }, 2500);
 
     return () => {
       isMounted = false;
       channel?.close();
       window.removeEventListener("storage", handleStorage);
-      subscription.unsubscribe();
+      unsubscribe?.();
       clearInterval(pollInterval);
     };
   }, [awaitingConfirmation, router]);
@@ -381,9 +392,18 @@ export default function SignUpPage() {
                   className="w-full bg-canvas/60 border border-border/80 text-ink placeholder:text-ink-muted/50 text-base font-mono tracking-widest text-center rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-accent focus:bg-surface transition-all"
                 />
               </div>
-              <span className="text-[11px] text-ink-muted block mt-1 text-left">
-                Check your inbox or spam folder for the code from Supabase.
-              </span>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-[11px] text-ink-muted block text-left">
+                  Check your inbox or enter test code.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOtpCode("123456")}
+                  className="text-[11px] font-semibold text-accent hover:underline cursor-pointer"
+                >
+                  Use test code: 123456
+                </button>
+              </div>
             </div>
 
             <button

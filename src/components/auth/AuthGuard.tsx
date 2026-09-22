@@ -18,6 +18,14 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
     const verifyUserSession = async () => {
       try {
+        if (!supabase?.auth?.getSession) {
+          if (isMounted) {
+            setIsAuthenticated(false);
+            router.replace("/signin");
+          }
+          return;
+        }
+
         const {
           data: { session },
           error,
@@ -65,37 +73,45 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     verifyUserSession();
 
     // Listen for auth state changes (e.g. sign out, token expiry)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
-        if (isMounted) {
-          setIsAuthenticated(false);
-          router.replace("/signin");
-        }
-      } else {
-        if (isMounted) {
-          setIsAuthenticated(true);
-          const metadataOnboarded = Boolean(session.user.user_metadata?.onboarding_completed);
-          let localOnboarded = false;
-          if (typeof window !== "undefined") {
-            const raw = localStorage.getItem("career_os_student_profile");
-            if (raw) {
-              try {
-                localOnboarded = Boolean(JSON.parse(raw).onboardingCompleted);
-              } catch (e) {}
+    let unsubscribe: (() => void) | undefined;
+    if (supabase?.auth?.onAuthStateChange) {
+      try {
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (!session?.user) {
+            if (isMounted) {
+              setIsAuthenticated(false);
+              router.replace("/signin");
+            }
+          } else {
+            if (isMounted) {
+              setIsAuthenticated(true);
+              const metadataOnboarded = Boolean(session.user.user_metadata?.onboarding_completed);
+              let localOnboarded = false;
+              if (typeof window !== "undefined") {
+                const raw = localStorage.getItem("career_os_student_profile");
+                if (raw) {
+                  try {
+                    localOnboarded = Boolean(JSON.parse(raw).onboardingCompleted);
+                  } catch (e) {}
+                }
+              }
+              if (!metadataOnboarded && !localOnboarded) {
+                router.replace("/onboarding");
+              }
             }
           }
-          if (!metadataOnboarded && !localOnboarded) {
-            router.replace("/onboarding");
-          }
-        }
+        });
+        unsubscribe = () => subscription?.unsubscribe?.();
+      } catch (subErr) {
+        console.error("Failed to subscribe to auth changes:", subErr);
       }
-    });
+    }
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, [router]);
 
