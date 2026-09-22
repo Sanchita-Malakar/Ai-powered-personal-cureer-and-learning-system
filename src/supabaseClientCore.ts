@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { SAMPLE_ONBOARDED_STUDENT } from "@/types/onboarding";
 
-// 1. Supabase configuration
+// 1. Supabase optional cloud configuration
 const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
 const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
 
@@ -14,7 +14,9 @@ const isConfiguredValidSupabase =
 let rawSupabaseClient: SupabaseClient | null = null;
 if (isConfiguredValidSupabase) {
   try {
-    rawSupabaseClient = createClient(envUrl, envKey);
+    rawSupabaseClient = createClient(envUrl, envKey, {
+      auth: { persistSession: false },
+    });
   } catch (err) {
     rawSupabaseClient = null;
   }
@@ -22,7 +24,6 @@ if (isConfiguredValidSupabase) {
 
 // 2. Storage keys
 const SESSION_STORAGE_KEY = "career_os_auth_session";
-const USERS_STORAGE_KEY = "career_os_registered_users";
 const PROFILE_STORAGE_KEY = "career_os_student_profile";
 
 export interface MockUser {
@@ -40,6 +41,7 @@ export interface MockUser {
   app_metadata: Record<string, any>;
   aud: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface MockSession {
@@ -72,26 +74,7 @@ function notifyAuthListeners(event: string, session: MockSession | null) {
   }
 }
 
-function getLocalUsers(): Record<string, { user: MockUser; password: string }> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(USERS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveLocalUser(emailOrPhone: string, user: MockUser, password: string) {
-  if (typeof window === "undefined") return;
-  try {
-    const users = getLocalUsers();
-    users[emailOrPhone.toLowerCase()] = { user, password };
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-  } catch (e) {}
-}
-
-function getLocalSession(): MockSession | null {
+export function getLocalSession(): MockSession | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -102,12 +85,12 @@ function getLocalSession(): MockSession | null {
   }
 }
 
-function setLocalSession(session: MockSession | null) {
+export function setLocalSession(session: MockSession | null) {
   if (typeof window === "undefined") return;
   try {
     if (session) {
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-      if (session.user.user_metadata?.career_profile) {
+      if (session.user?.user_metadata?.career_profile) {
         localStorage.setItem(
           PROFILE_STORAGE_KEY,
           JSON.stringify(session.user.user_metadata.career_profile)
@@ -119,32 +102,7 @@ function setLocalSession(session: MockSession | null) {
   } catch (e) {}
 }
 
-function createSessionForUser(user: MockUser): MockSession {
-  return {
-    access_token: `career_os_jwt_${user.id}_${Date.now()}`,
-    token_type: "bearer",
-    expires_in: 3600 * 24 * 30, // 30 days
-    refresh_token: `career_os_refresh_${user.id}_${Date.now()}`,
-    user,
-  };
-}
-
-function isFetchError(err: any): boolean {
-  if (!err) return false;
-  const msg = (err?.message || err?.error_description || String(err)).toLowerCase();
-  return (
-    msg.includes("failed to fetch") ||
-    msg.includes("network error") ||
-    msg.includes("fetch failed") ||
-    msg.includes("enotfound") ||
-    msg.includes("load failed") ||
-    msg.includes("networkerror") ||
-    msg.includes("timeout") ||
-    msg.includes("timed out")
-  );
-}
-
-// Authentication Engine
+// Authentication Engine connected to persistent backend API
 const authEngine = {
   async getSession(): Promise<{ data: { session: any }; error: any }> {
     const localSession = getLocalSession();
@@ -152,15 +110,22 @@ const authEngine = {
       return { data: { session: localSession }, error: null };
     }
 
-    if (rawSupabaseClient) {
+    // Try verifying from server session endpoint
+    if (typeof window !== "undefined") {
       try {
-        const res = await rawSupabaseClient.auth.getSession();
-        if (!res.error && res.data.session) {
-          return res;
+        const res = await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: localSession?.access_token }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data?.session) {
+            setLocalSession(json.data.session);
+            return { data: { session: json.data.session }, error: null };
+          }
         }
-      } catch (err) {
-        // Fall back to local
-      }
+      } catch (e) {}
     }
 
     return { data: { session: null }, error: null };
@@ -172,16 +137,8 @@ const authEngine = {
       return { data: { user: localSession.user }, error: null };
     }
 
-    if (rawSupabaseClient) {
-      try {
-        const res = await rawSupabaseClient.auth.getUser();
-        if (!res.error && res.data.user) {
-          return res;
-        }
-      } catch (err) {}
-    }
-
-    return { data: { user: null }, error: null };
+    const { data } = await this.getSession();
+    return { data: { user: data.session?.user || null }, error: null };
   },
 
   async signInWithPassword(credentials: {
@@ -206,92 +163,39 @@ const authEngine = {
       };
     }
 
-    // 1. If live Supabase client is configured, attempt cloud sign in
-    if (rawSupabaseClient) {
-      try {
-        const result = email
-          ? await rawSupabaseClient.auth.signInWithPassword({ email, password })
-          : await rawSupabaseClient.auth.signInWithPassword({ phone: phone!, password });
+    try {
+      const response = await fetch("/api/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, phone, password }),
+      });
 
-        if (!result.error && result.data.session) {
-          return result;
-        }
-        if (!isFetchError(result.error)) {
-          return result;
-        }
-      } catch (err: any) {
-        if (!isFetchError(err)) {
-          return { data: { user: null, session: null }, error: err };
-        }
-      }
-    }
+      const result = await response.json();
 
-    // 2. Local Account Verification
-    const normalizedIdentifier = identifier.toLowerCase();
-    const localUsers = getLocalUsers();
-    const existing = localUsers[normalizedIdentifier];
-
-    let targetUser: MockUser;
-
-    if (existing) {
-      // Validate password
-      if (existing.password && existing.password !== password) {
+      if (!response.ok || result.error) {
         return {
           data: { user: null, session: null },
-          error: { message: "Invalid email or password. Please verify your credentials and try again." },
+          error: { message: result.error?.message || "Invalid credentials" },
         };
       }
-      targetUser = existing.user;
-    } else {
-      // If user is not yet in the local registry, auto-register their account with the entered credentials
-      const formattedName = identifier.includes("@")
-        ? identifier.split("@")[0].replace(/[._-]/g, " ")
-        : "Student";
 
-      const capitalizedName = formattedName
-        .split(" ")
-        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-        .join(" ");
+      const session = result.data.session;
+      const user = result.data.user;
 
-      targetUser = {
-        id: `student_${Date.now()}`,
-        email: email ? identifier : undefined,
-        phone: phone ? identifier : undefined,
-        user_metadata: {
-          full_name: capitalizedName,
-          phone: phone || "",
-          target_role: "Junior Full Stack Developer",
-          onboarding_completed: true,
-          career_profile: {
-            ...SAMPLE_ONBOARDED_STUDENT,
-            personalInfo: {
-              ...SAMPLE_ONBOARDED_STUDENT.personalInfo,
-              fullName: capitalizedName,
-              email: email || identifier,
-              phone: phone || "",
-            },
-            onboardingCompleted: true,
-          },
-        },
-        app_metadata: { provider: email ? "email" : "phone" },
-        aud: "authenticated",
-        created_at: new Date().toISOString(),
+      setLocalSession(session);
+      notifyAuthListeners("SIGNED_IN", session);
+
+      return {
+        data: { user, session },
+        error: null,
       };
-
-      saveLocalUser(identifier, targetUser, password);
+    } catch (err: any) {
+      console.error("Sign in network error:", err);
+      return {
+        data: { user: null, session: null },
+        error: { message: err?.message || "Unable to reach authentication server." },
+      };
     }
-
-    const session = createSessionForUser(targetUser);
-    setLocalSession(session);
-    notifyAuthListeners("SIGNED_IN", session);
-
-    return {
-      data: {
-        user: targetUser,
-        session,
-      },
-      error: null,
-    };
   },
 
   async signUp(params: {
@@ -318,69 +222,82 @@ const authEngine = {
       };
     }
 
-    // 1. If live Supabase client is configured, attempt cloud sign up
-    if (rawSupabaseClient) {
-      try {
-        const result = await rawSupabaseClient.auth.signUp(params as any);
-        if (!result.error) {
-          return result;
-        }
-        if (!isFetchError(result.error)) {
-          return result;
-        }
-      } catch (err: any) {
-        if (!isFetchError(err)) {
-          return { data: { user: null, session: null }, error: err };
-        }
-      }
+    if (!password || password.length < 6) {
+      return {
+        data: { user: null, session: null },
+        error: { message: "Password must be at least 6 characters." },
+      };
     }
 
-    // 2. Local Account Creation
-    const studentName = options?.data?.full_name?.trim() || "Student";
-    const targetRole = options?.data?.target_role || "Junior Full Stack Developer";
+    try {
+      const studentName = options?.data?.full_name?.trim() || "Student";
+      const targetRole = options?.data?.target_role || "Junior Full Stack Developer";
 
-    const newUser: MockUser = {
-      id: `student_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      email: email ? identifier : undefined,
-      phone: phone ? identifier : undefined,
-      user_metadata: {
-        full_name: studentName,
-        phone: options?.data?.phone || phone || "",
-        target_role: targetRole,
-        onboarding_completed: true,
-        career_profile: {
-          ...SAMPLE_ONBOARDED_STUDENT,
-          personalInfo: {
-            ...SAMPLE_ONBOARDED_STUDENT.personalInfo,
-            fullName: studentName,
-            email: email || identifier,
-            phone: options?.data?.phone || phone || "",
-          },
-          careerPreferences: {
-            ...SAMPLE_ONBOARDED_STUDENT.careerPreferences,
-            primaryRole: targetRole,
-            targetRoles: [targetRole],
-          },
-          onboardingCompleted: true,
+      const careerProfile = {
+        ...SAMPLE_ONBOARDED_STUDENT,
+        personalInfo: {
+          ...SAMPLE_ONBOARDED_STUDENT.personalInfo,
+          fullName: studentName,
+          email: email || identifier,
+          phone: options?.data?.phone || phone || "",
         },
-      },
-      app_metadata: { provider: email ? "email" : "phone" },
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-    };
+        careerPreferences: {
+          ...SAMPLE_ONBOARDED_STUDENT.careerPreferences,
+          primaryRole: targetRole,
+          targetRoles: [targetRole],
+        },
+        onboardingCompleted: true,
+      };
 
-    saveLocalUser(identifier, newUser, password);
-    const session = createSessionForUser(newUser);
-    setLocalSession(session);
-    notifyAuthListeners("SIGNED_IN", session);
+      const enrichedOptions = {
+        ...options,
+        data: {
+          full_name: studentName,
+          phone: options?.data?.phone || phone || "",
+          target_role: targetRole,
+          onboarding_completed: true,
+          career_profile: careerProfile,
+          ...(options?.data || {}),
+        },
+      };
 
-    return {
-      data: {
-        user: newUser,
-        session,
-      },
-      error: null,
-    };
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          phone,
+          password,
+          options: enrichedOptions,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
+        return {
+          data: { user: null, session: null },
+          error: { message: result.error?.message || "Registration failed." },
+        };
+      }
+
+      const session = result.data.session;
+      const user = result.data.user;
+
+      setLocalSession(session);
+      notifyAuthListeners("SIGNED_IN", session);
+
+      return {
+        data: { user, session },
+        error: null,
+      };
+    } catch (err: any) {
+      console.error("Sign up network error:", err);
+      return {
+        data: { user: null, session: null },
+        error: { message: err?.message || "Unable to reach registration server." },
+      };
+    }
   },
 
   async verifyOtp(params: {
@@ -389,87 +306,91 @@ const authEngine = {
     token: string;
     type?: string;
   }): Promise<{ data: { session: any; user: any }; error: any }> {
-    if (rawSupabaseClient) {
-      try {
-        const result = await rawSupabaseClient.auth.verifyOtp(params as any);
-        if (!result.error) return result;
-        if (!isFetchError(result.error)) return result;
-      } catch (err) {
-        if (!isFetchError(err)) return { data: { session: null, user: null }, error: err };
-      }
-    }
-
     const currentSession = getLocalSession();
     if (currentSession) {
       notifyAuthListeners("SIGNED_IN", currentSession);
       return { data: { session: currentSession, user: currentSession.user }, error: null };
     }
 
-    return { data: { session: null, user: null }, error: { message: "Invalid or expired verification code." } };
+    return {
+      data: { session: null, user: null },
+      error: { message: "Invalid or expired verification code." },
+    };
   },
 
   async resend(params: any): Promise<{ data: any; error: any }> {
-    if (rawSupabaseClient) {
-      try {
-        const result = await rawSupabaseClient.auth.resend(params);
-        if (!result.error) return result;
-        if (!isFetchError(result.error)) return result;
-      } catch (err) {
-        if (!isFetchError(err)) return { data: null, error: err };
-      }
-    }
-    return { data: { message: "Verification code sent." }, error: null };
+    return { data: null, error: null };
   },
 
-  async exchangeCodeForSession(code: string): Promise<{ data: any; error: any }> {
-    if (rawSupabaseClient) {
-      try {
-        const result = await rawSupabaseClient.auth.exchangeCodeForSession(code);
-        if (!result.error) return result;
-        if (!isFetchError(result.error)) return result;
-      } catch (err) {
-        if (!isFetchError(err)) return { data: null, error: err };
-      }
+  async exchangeCodeForSession(code: string): Promise<{ data: { session: any; user: any }; error: any }> {
+    const currentSession = getLocalSession();
+    if (currentSession) {
+      return { data: { session: currentSession, user: currentSession.user }, error: null };
     }
-
-    const session = getLocalSession();
-    return { data: { session, user: session?.user || null }, error: null };
+    return { data: { session: null, user: null }, error: null };
   },
 
   async updateUser(attributes: {
-    data?: any;
     email?: string;
     password?: string;
+    data?: any;
+    [key: string]: any;
   }): Promise<{ data: { user: any }; error: any }> {
-    if (rawSupabaseClient) {
-      try {
-        const result = await rawSupabaseClient.auth.updateUser(attributes);
-        if (!result.error) return result;
-        if (!isFetchError(result.error)) return result;
-      } catch (err) {
-        if (!isFetchError(err)) return { data: { user: null }, error: err };
-      }
+    const session = getLocalSession();
+    if (!session) {
+      return { data: { user: null }, error: new Error("No active session found to update.") };
     }
 
-    const session = getLocalSession();
-    if (session?.user) {
+    try {
+      const response = await fetch("/api/auth/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          token: session.access_token,
+          attributes,
+        }),
+      });
+
+      const result = await response.json();
+      if (response.ok && result.data?.user) {
+        session.user = {
+          ...session.user,
+          ...result.data.user,
+          user_metadata: {
+            ...session.user.user_metadata,
+            ...result.data.user.user_metadata,
+          },
+        };
+        setLocalSession(session);
+        notifyAuthListeners("USER_UPDATED", session);
+        return { data: { user: session.user }, error: null };
+      }
+    } catch (e) {}
+
+    // Fallback local merge
+    if (attributes.data) {
       session.user.user_metadata = {
         ...session.user.user_metadata,
         ...attributes.data,
       };
-      if (attributes.email) session.user.email = attributes.email;
-      setLocalSession(session);
-      notifyAuthListeners("USER_UPDATED", session);
-      return { data: { user: session.user }, error: null };
     }
-
-    return { data: { user: null }, error: new Error("No active session found to update.") };
+    setLocalSession(session);
+    notifyAuthListeners("USER_UPDATED", session);
+    return { data: { user: session.user }, error: null };
   },
 
   async signOut(): Promise<{ error: any }> {
-    if (rawSupabaseClient) {
+    const session = getLocalSession();
+    if (session?.access_token) {
       try {
-        await rawSupabaseClient.auth.signOut();
+        await fetch("/api/auth/signout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: session.access_token }),
+        });
       } catch (e) {}
     }
 
