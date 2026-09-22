@@ -36,7 +36,8 @@ interface DatabaseSchema {
   sessions: Record<string, StoredSession>; // token -> StoredSession
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? path.join("/tmp", "career_os_data") : path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "auth_db.json");
 
 function ensureDatabaseExists(): DatabaseSchema {
@@ -46,6 +47,16 @@ function ensureDatabaseExists(): DatabaseSchema {
     }
 
     if (!fs.existsSync(DB_FILE)) {
+      // If running on Vercel, attempt to copy the bundled database if present
+      const bundledDb = path.join(process.cwd(), "data", "auth_db.json");
+      if (isVercel && fs.existsSync(bundledDb)) {
+        try {
+          fs.copyFileSync(bundledDb, DB_FILE);
+          const raw = fs.readFileSync(DB_FILE, "utf8");
+          if (raw.trim()) return JSON.parse(raw) as DatabaseSchema;
+        } catch (e) {}
+      }
+
       const initial: DatabaseSchema = {
         users: {},
         emailIndex: {},
