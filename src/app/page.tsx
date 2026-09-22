@@ -25,7 +25,6 @@ import { ProgressSection } from "@/components/progress/ProgressSection";
 import { ProfileSection } from "@/components/profile/ProfileSection";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { AuthGuard } from "@/components/auth/AuthGuard";
 import { ModuleType } from "@/types/dashboard";
 
 export default function DashboardPage() {
@@ -156,8 +155,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-canvas bg-ambient-mesh text-ink transition-colors duration-200">
+    <div className="min-h-screen bg-canvas bg-ambient-mesh text-ink transition-colors duration-200">
         {/* 1. Full-width Top Navbar */}
         <Navbar onToggleMobileMenu={() => setMobileNavOpen((prev) => !prev)} />
 
@@ -304,6 +302,5 @@ export default function DashboardPage() {
           onCompleteTask={toggleTodayTask}
         />
       </div>
-    </AuthGuard>
   );
 }

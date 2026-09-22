@@ -24,7 +24,7 @@ An intelligent, deterministic student career acceleration platform designed to b
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Data Visualization**: [Recharts](https://recharts.org/)
-- **Backend & Authentication**: [Supabase](https://supabase.com/)
+- **State & Local Storage**: Native React Hooks & Browser Storage
 
 ---
 
@@ -48,18 +48,12 @@ An intelligent, deterministic student career acceleration platform designed to b
    npm install
    ```
 
-3. Configure Supabase in `.env.local` or [src/supabaseClient.ts](file:///d:/7th%20sem%20project/src/supabaseClient.ts):
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
-   ```
-
-4. Start the development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser. All student features are immediately accessible with zero login barriers.
 
 ---
 
@@ -69,14 +63,20 @@ An intelligent, deterministic student career acceleration platform designed to b
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx         # Root layout with fonts & theme initialization
-│   │   ├── page.tsx           # Protected student dashboard
-│   │   ├── signin/page.tsx    # Supabase email & phone sign in
-│   │   └── signup/page.tsx    # Supabase student registration
-│   ├── components/
-│   │   ├── auth/              # AuthLayout & AuthGuard route protection
-│   │   └── dashboard/         # Hero, Metrics, AiTodaysPlan, TiltCard, Sidebar, Navbar
-│   ├── hooks/                 # Dashboard state and logic hooks
-│   └── supabaseClient.ts      # Supabase client & local auth fallback engine
+│   │   ├── page.tsx           # Main interactive student dashboard
+│   │   ├── onboarding/        # Multi-step profile setup wizard
+│   │   ├── roadmap/           # Skill & career milestones
+│   │   ├── jobs/              # Application tracking pipeline
+│   │   ├── resume/            # ATS resume analyzer & suggestions
+│   │   ├── interview/         # Behavioral & technical question simulator
+│   │   ├── dsa/               # Algorithm & data structures practice
+│   │   ├── learning/          # Curated learning pathways
+│   │   ├── mentor/            # AI career coach & action planner
+│   │   ├── progress/          # Readiness analytics & metrics
+│   │   ├── profile/           # Academic background & skills inventory
+│   │   └── settings/          # Theme & preferences
+│   ├── components/            # Reusable UI cards, tables, charts, & navigation
+│   └── hooks/                 # Profile state, hydration & dashboard logic
 └── ...
 ```
 

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { DashboardData, ModuleType } from "@/types/dashboard";
 import { initialDashboardData } from "@/data/mockDashboardData";
 import { CompleteStudentProfile } from "@/types/onboarding";
-import { supabase } from "@/supabaseClient";
 
 export function useDashboardData() {
   const [data, setData] = useState<DashboardData>(initialDashboardData);
@@ -13,7 +12,7 @@ export function useDashboardData() {
 
   useEffect(() => {
     // Check localStorage for customized student profile
-    const hydrateProfile = async () => {
+    const hydrateProfile = () => {
       let studentProfile: CompleteStudentProfile | null = null;
 
       if (typeof window !== "undefined") {
@@ -23,15 +22,6 @@ export function useDashboardData() {
             studentProfile = JSON.parse(raw);
           } catch (e) {}
         }
-      }
-
-      if (!studentProfile) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user?.user_metadata?.career_profile) {
-            studentProfile = user.user_metadata.career_profile;
-          }
-        } catch (e) {}
       }
 
       if (studentProfile && studentProfile.personalInfo?.fullName) {

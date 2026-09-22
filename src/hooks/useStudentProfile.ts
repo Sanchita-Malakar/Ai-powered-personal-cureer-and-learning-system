@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/supabaseClient";
 import {
   CompleteStudentProfile,
   DEFAULT_STUDENT_PROFILE,
@@ -20,75 +19,30 @@ import {
 const STORAGE_KEY = "career_os_student_profile";
 
 export function useStudentProfile() {
-  const [profile, setProfile] = useState<CompleteStudentProfile>(DEFAULT_STUDENT_PROFILE);
+  const [profile, setProfile] = useState<CompleteStudentProfile>(SAMPLE_ONBOARDED_STUDENT);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Load from Supabase user metadata or localStorage
+  // Load from localStorage or initialize with sample onboarded student
   useEffect(() => {
     let isMounted = true;
 
-    const loadProfile = async () => {
+    const loadProfile = () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user && isMounted) {
-          setCurrentUser(user);
-        }
-
-        // Check localStorage first for rapid hydration
-        let localData: CompleteStudentProfile | null = null;
         if (typeof window !== "undefined") {
           const raw = localStorage.getItem(STORAGE_KEY);
           if (raw) {
             try {
-              localData = JSON.parse(raw);
+              const parsed = JSON.parse(raw);
+              if (isMounted) setProfile(parsed);
+              return;
             } catch (e) {
               console.error("Failed to parse localStorage profile", e);
             }
           }
-        }
-
-        // Check Supabase metadata
-        const metadataProfile = user?.user_metadata?.career_profile;
-        const metadataOnboarded = Boolean(user?.user_metadata?.onboarding_completed);
-
-        if (metadataProfile) {
-          const merged: CompleteStudentProfile = {
-            ...DEFAULT_STUDENT_PROFILE,
-            ...metadataProfile,
-            onboardingCompleted: metadataOnboarded ?? metadataProfile.onboardingCompleted ?? false,
-          };
-          if (isMounted) {
-            setProfile(merged);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-          }
-        } else if (localData) {
-          if (isMounted) {
-            setProfile(localData);
-          }
-        } else if (user) {
-          // Pre-populate with auth data if available
-          if (isMounted) {
-            setProfile((prev) => ({
-              ...prev,
-              personalInfo: {
-                ...prev.personalInfo,
-                fullName: user.user_metadata?.full_name || prev.personalInfo.fullName,
-                email: user.email || prev.personalInfo.email,
-                phone: user.user_metadata?.phone || prev.personalInfo.phone,
-              },
-              careerPreferences: {
-                ...prev.careerPreferences,
-                primaryRole: user.user_metadata?.target_role || prev.careerPreferences.primaryRole,
-                targetRoles: user.user_metadata?.target_role
-                  ? [user.user_metadata.target_role]
-                  : prev.careerPreferences.targetRoles,
-              },
-            }));
-          }
+          // Seed with default sample profile if none exists
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_ONBOARDED_STUDENT));
+          if (isMounted) setProfile(SAMPLE_ONBOARDED_STUDENT);
         }
       } catch (err) {
         console.error("Error loading student profile", err);
@@ -119,23 +73,6 @@ export function useStudentProfile() {
       // Persist in localStorage
       if (typeof window !== "undefined") {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(finalProfile));
-      }
-
-      // Persist in Supabase user_metadata if user is signed in
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.auth.updateUser({
-            data: {
-              career_profile: finalProfile,
-              onboarding_completed: finalProfile.onboardingCompleted,
-              full_name: finalProfile.personalInfo.fullName || user.user_metadata?.full_name,
-              target_role: finalProfile.careerPreferences.primaryRole || user.user_metadata?.target_role,
-            },
-          });
-        }
-      } catch (err) {
-        console.error("Supabase profile sync warning:", err);
       }
 
       return finalProfile;

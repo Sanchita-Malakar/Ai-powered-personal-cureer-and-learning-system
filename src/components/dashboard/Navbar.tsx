@@ -2,87 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Search, Bell, HelpCircle, Menu, X, LogOut, User, Settings } from "lucide-react";
+import { Search, Bell, HelpCircle, Menu, X, User, Settings } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import { supabase } from "@/supabaseClient";
 
 interface NavbarProps {
   onToggleMobileMenu?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
-  const router = useRouter();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
   const [onboardedProfile, setOnboardedProfile] = useState<any>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchUser = async () => {
-      try {
-        if (!supabase?.auth?.getUser) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch (err) {
-        console.error("Failed to fetch user in Navbar:", err);
-      }
-      if (typeof window !== "undefined") {
-        const raw = localStorage.getItem("career_os_student_profile");
-        if (raw) {
-          try {
-            if (isMounted) setOnboardedProfile(JSON.parse(raw));
-          } catch (e) {}
-        }
-      }
-    };
-    fetchUser();
-
-    let unsubscribe: (() => void) | undefined;
-    if (supabase?.auth?.onAuthStateChange) {
-      try {
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (isMounted) {
-            setCurrentUser(session?.user || null);
-          }
-        });
-        unsubscribe = () => subscription?.unsubscribe?.();
-      } catch (e) {
-        console.error("Failed to subscribe in Navbar:", e);
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("career_os_student_profile");
+      if (raw) {
+        try {
+          setOnboardedProfile(JSON.parse(raw));
+        } catch (e) {}
       }
     }
-
-    return () => {
-      isMounted = false;
-      unsubscribe?.();
-    };
   }, []);
 
-  const handleSignOut = async () => {
-    setProfileMenuOpen(false);
-    await supabase.auth.signOut();
-    window.location.href = "/signin";
-  };
-
   const displayName =
-    onboardedProfile?.personalInfo?.fullName ||
-    currentUser?.user_metadata?.full_name ||
-    "Student";
+    onboardedProfile?.personalInfo?.fullName || "Alex Rivera";
   const displayEmail =
-    onboardedProfile?.personalInfo?.email ||
-    currentUser?.email ||
-    "student@university.edu";
+    onboardedProfile?.personalInfo?.email || "student@university.edu";
   const displayPhone =
-    onboardedProfile?.personalInfo?.phone ||
-    currentUser?.user_metadata?.phone ||
-    "";
+    onboardedProfile?.personalInfo?.phone || "";
   const displaySubtitle = onboardedProfile?.careerPreferences?.primaryRole
     ? `${onboardedProfile.careerPreferences.primaryRole}`
     : "CareerOS Student";
@@ -101,82 +49,72 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
         {onToggleMobileMenu && (
           <button
             onClick={onToggleMobileMenu}
-            className="md:hidden p-2 text-ink-muted hover:text-ink rounded-lg hover:bg-canvas transition-colors active:scale-95 focus-visible:outline-accent"
+            className="md:hidden p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-ink hover:bg-canvas transition-colors focus-visible:outline-accent"
             aria-label="Toggle navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
+
         <Link
           href="/"
-          className="flex items-center gap-2.5 group text-ink focus-visible:outline-accent"
+          className="flex items-center gap-2 text-ink group focus-visible:outline-accent rounded-lg"
         >
-          <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center text-white font-bold text-xs tracking-tight shadow-md shadow-accent/25 transition-transform duration-200 group-hover:scale-105 group-hover:rotate-3">
+          <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-accent/25 transition-transform duration-200 group-hover:scale-105">
             C
           </div>
-          <span className="font-bold text-[16px] tracking-tight text-ink">
-            CareerOS
-          </span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-bold text-sm sm:text-base tracking-tight">CareerOS</span>
+            <span className="hidden xs:inline-block text-[10px] font-semibold text-accent uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/10 border border-accent/20">
+              Student Edition
+            </span>
+          </div>
         </Link>
       </div>
 
-      {/* Global Search (Desktop & Tablet) */}
-      <div className="flex-1 max-w-md mx-3 sm:mx-6 hidden sm:block">
-        <div className="relative group">
-          <Search className="w-4 h-4 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors group-focus-within:text-accent" />
+      {/* Global Search Bar */}
+      <div className="hidden md:flex items-center flex-1 max-w-md mx-6">
+        <div className="relative w-full">
+          <Search className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
-            type="text"
-            placeholder="Search roles, skills, roadmap milestones..."
-            className="w-full bg-canvas/80 border border-border/80 text-ink placeholder:text-ink-muted text-[13px] rounded-lg pl-9 pr-3 py-1.5 focus:outline-none focus:border-accent focus:bg-surface focus:shadow-sm focus:shadow-accent/10 transition-all"
+            id="global-search-input"
+            type="search"
+            placeholder="Search skills, roadmap milestones, jobs, questions... (Press '/' to focus)"
+            className="w-full bg-canvas/70 hover:bg-canvas focus:bg-surface border border-border/80 focus:border-accent text-ink placeholder:text-ink-muted/70 text-[12px] rounded-lg pl-8 pr-8 py-1.5 transition-all duration-150 outline-none shadow-none focus:shadow-sm"
           />
+          <kbd className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-ink-muted/80 bg-surface border border-border rounded shadow-2xs pointer-events-none">
+            /
+          </kbd>
         </div>
       </div>
 
-      {/* Mobile Search Input Overlay */}
-      {mobileSearchOpen && (
-        <div className="absolute inset-0 bg-surface px-3 flex items-center gap-2 sm:hidden z-50">
-          <Search className="w-4 h-4 text-ink-muted" />
-          <input
-            type="text"
-            autoFocus
-            placeholder="Search roles, skills, roadmap..."
-            className="flex-1 bg-transparent text-[13px] text-ink outline-none"
-          />
-          <button
-            onClick={() => setMobileSearchOpen(false)}
-            className="p-1.5 text-ink-muted hover:text-ink"
-            aria-label="Close search"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Actions & Avatar */}
-      <div className="flex items-center gap-1 sm:gap-2">
-        {/* Mobile search icon button */}
+      {/* Right Controls: Actions & Profile */}
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Mobile Search Toggle */}
         <button
-          onClick={() => setMobileSearchOpen(true)}
-          className="sm:hidden p-2 text-ink-muted hover:text-ink rounded-lg hover:bg-canvas transition-colors active:scale-95"
-          aria-label="Search"
+          onClick={() => setMobileSearchOpen((prev) => !prev)}
+          className="md:hidden p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-canvas transition-colors focus-visible:outline-accent"
+          aria-label="Open search"
         >
-          <Search className="w-4 h-4" />
+          {mobileSearchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
         </button>
 
         {/* Notifications */}
         <button
-          className="relative p-2 text-ink-muted hover:text-ink rounded-lg hover:bg-canvas transition-all duration-150 active:scale-95 focus-visible:outline-accent"
-          aria-label="Notifications"
+          id="navbar-notifications-btn"
+          className="relative p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-canvas transition-colors focus-visible:outline-accent"
+          aria-label="Notifications (2 unread)"
           title="Notifications"
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-attention ring-2 ring-surface shadow-sm animate-pulse" />
+          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-attention ring-2 ring-surface animate-pulse" />
         </button>
 
-        {/* Help */}
+        {/* Help & Support */}
         <button
-          className="p-2 text-ink-muted hover:text-ink rounded-lg hover:bg-canvas transition-all duration-150 active:scale-95 focus-visible:outline-accent hidden xs:flex"
-          aria-label="Help and resources"
+          id="navbar-help-btn"
+          className="hidden sm:flex p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-canvas transition-colors focus-visible:outline-accent"
+          aria-label="Help & Documentation"
           title="Help & documentation"
         >
           <HelpCircle className="w-4 h-4" />
@@ -186,33 +124,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
         <ThemeToggle />
 
         <div className="h-4 w-[1px] bg-border/80 dark:bg-zinc-800 mx-0.5 sm:mx-1" />
-
-        {/* Auth status buttons: Sign out if already signed in, Sign in & Sign up if logged out */}
-        {currentUser ? (
-          <button
-            onClick={handleSignOut}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors focus-visible:outline-accent cursor-pointer"
-            title="Sign out of CareerOS"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign out</span>
-          </button>
-        ) : (
-          <>
-            <Link
-              href="/signin"
-              className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-[13px] font-semibold text-ink hover:text-accent hover:bg-canvas transition-colors focus-visible:outline-accent"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="hidden md:inline-flex items-center px-3 py-1.5 rounded-lg bg-accent text-white text-[12px] font-semibold hover:bg-accent/90 shadow-sm shadow-accent/25 transition-all focus-visible:outline-accent"
-            >
-              Sign up
-            </Link>
-          </>
-        )}
 
         {/* User profile dropdown button */}
         <div className="relative">
@@ -235,56 +146,52 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
             </div>
           </button>
 
-          {/* Profile Menu Dropdown */}
+          {/* Profile Dropdown Menu */}
           {profileMenuOpen && (
             <>
               <div
                 className="fixed inset-0 z-40"
                 onClick={() => setProfileMenuOpen(false)}
-                aria-hidden="true"
               />
-              <div className="absolute right-0 mt-2 w-64 bg-surface/95 dark:bg-zinc-900/95 backdrop-blur-md border border-border dark:border-zinc-800 rounded-xl p-3 shadow-xl shadow-black/10 dark:shadow-black/40 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="pb-3 border-b border-border/80 dark:border-zinc-800 mb-2">
-                  <p className="text-[14px] font-bold text-ink leading-tight truncate">
-                    {displayName}
-                  </p>
-                  <p className="text-[11px] text-ink-muted leading-tight mt-0.5 truncate">
-                    {displayEmail}
-                  </p>
-                  <p className="text-[11px] text-accent font-medium leading-tight mt-1 truncate">
-                    {displaySubtitle}
-                  </p>
+              <div className="absolute right-0 mt-2 w-64 bg-surface border border-border/80 rounded-xl shadow-xl z-50 py-2 text-xs animate-in fade-in zoom-in-95 duration-100 dark:border-zinc-800">
+                {/* Header in dropdown */}
+                <div className="px-3 py-2 border-b border-border/80 dark:border-zinc-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-accent text-white font-bold text-xs flex items-center justify-center shadow-sm shadow-accent/20">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-ink text-[13px] truncate">{displayName}</p>
+                      <p className="text-[11px] text-ink-muted truncate">{displayEmail}</p>
+                    </div>
+                  </div>
+                  {displayPhone && (
+                    <p className="text-[10px] text-ink-muted/80 mt-1 font-mono">{displayPhone}</p>
+                  )}
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent/10 text-accent font-semibold text-[10px]">
+                    <span>🎯</span>
+                    <span className="truncate">{displaySubtitle}</span>
+                  </div>
                 </div>
 
-                <div className="space-y-1 text-[13px]">
+                {/* Menu items */}
+                <div className="p-1 space-y-0.5">
                   <Link
-                    href="#profile"
-                    onClick={() => {
-                      setProfileMenuOpen(false);
-                      if (typeof window !== "undefined") {
-                        window.location.hash = "profile";
-                      }
-                    }}
-                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-accent/10 hover:text-accent font-semibold transition-colors"
+                    href="/profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-canvas font-medium transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <User className="w-3.5 h-3.5 text-accent" />
-                      <span>Complete Career Profile</span>
+                      <span>Profile & Academics</span>
                     </div>
-                    <span className="text-[10px] uppercase font-bold text-accent px-1.5 py-0.5 rounded bg-accent/10">
-                      View
-                    </span>
+                    <span className="text-[11px] text-ink-muted">→</span>
                   </Link>
 
                   <Link
-                    href="#settings"
-                    onClick={() => {
-                      setProfileMenuOpen(false);
-                      if (typeof window !== "undefined") {
-                        window.location.hash = "settings";
-                      }
-                    }}
-                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-accent/10 hover:text-accent font-semibold transition-colors"
+                    href="/settings"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-canvas font-medium transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <Settings className="w-3.5 h-3.5 text-accent" />
@@ -301,36 +208,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
                     <span>Onboarding Wizard</span>
                     <span className="text-[10px] text-ink-muted">Edit →</span>
                   </Link>
-
-                  <Link
-                    href="/signin"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-canvas hover:text-accent font-medium transition-colors"
-                  >
-                    <span>Sign in / Switch account</span>
-                    <span className="text-[11px] text-ink-muted">→</span>
-                  </Link>
-
-                  <Link
-                    href="/signup"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-canvas hover:text-accent font-medium transition-colors"
-                  >
-                    <span>Create new account</span>
-                    <span className="text-[10px] uppercase font-bold text-accent px-1.5 py-0.5 rounded bg-accent/10">
-                      New
-                    </span>
-                  </Link>
-
-                  <div className="pt-1 mt-1 border-t border-border/80 dark:border-zinc-800">
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 font-medium transition-colors cursor-pointer text-left"
-                    >
-                      <span>Sign out</span>
-                      <LogOut className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
               </div>
             </>
