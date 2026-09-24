@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Bell, HelpCircle, Menu, X, User, Settings } from "lucide-react";
+import { Search, Bell, HelpCircle, Menu, X, User, Settings, LogIn, LogOut, UserPlus } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 interface NavbarProps {
   onToggleMobileMenu?: () => void;
@@ -14,6 +15,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [onboardedProfile, setOnboardedProfile] = useState<any>(null);
 
+  const { user, signOut, isAuthenticated } = useAuth();
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem("career_os_student_profile");
@@ -23,17 +26,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
         } catch (e) {}
       }
     }
-  }, []);
+  }, [user]);
 
   const displayName =
-    onboardedProfile?.personalInfo?.fullName || "Alex Rivera";
+    user?.fullName || onboardedProfile?.personalInfo?.fullName || "Alex Rivera";
   const displayEmail =
-    onboardedProfile?.personalInfo?.email || "student@university.edu";
+    user?.email || onboardedProfile?.personalInfo?.email || "student@university.edu";
   const displayPhone =
     onboardedProfile?.personalInfo?.phone || "";
-  const displaySubtitle = onboardedProfile?.careerPreferences?.primaryRole
-    ? `${onboardedProfile.careerPreferences.primaryRole}`
-    : "CareerOS Student";
+  const displaySubtitle =
+    user?.targetRole ||
+    (onboardedProfile?.careerPreferences?.primaryRole
+      ? `${onboardedProfile.careerPreferences.primaryRole}`
+      : "CareerOS Student");
 
   const initials = displayName
     .split(" ")
@@ -125,6 +130,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
 
         <div className="h-4 w-[1px] bg-border/80 dark:bg-zinc-800 mx-0.5 sm:mx-1" />
 
+        {!isAuthenticated && (
+          <Link
+            href="/signin"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold shadow-sm shadow-accent/20 hover:bg-accent/90 active:scale-95 transition-all"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </Link>
+        )}
+
         {/* User profile dropdown button */}
         <div className="relative">
           <button
@@ -208,6 +223,48 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
                     <span>Onboarding Wizard</span>
                     <span className="text-[10px] text-ink-muted">Edit →</span>
                   </Link>
+
+                  <div className="my-1 border-t border-border/80 dark:border-zinc-800" />
+
+                  <Link
+                    href="/signin"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-canvas font-medium transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <LogIn className="w-3.5 h-3.5 text-accent" />
+                      <span>Sign In / Switch Account</span>
+                    </div>
+                    <span className="text-[10px] text-ink-muted">Login →</span>
+                  </Link>
+
+                  <Link
+                    href="/signup"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center justify-between px-2.5 py-2 rounded-lg text-ink hover:bg-canvas font-medium transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Create Account</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">New</span>
+                  </Link>
+
+                  {user && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setProfileMenuOpen(false);
+                        await signOut();
+                      }}
+                      className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-action hover:bg-action/10 font-medium transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
             </>

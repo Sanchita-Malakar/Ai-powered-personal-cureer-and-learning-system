@@ -17,6 +17,8 @@ import {
   Settings,
   X,
   ChevronRight,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -369,6 +371,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 );
               })}
             </nav>
+
+            {/* Mobile Drawer Auth Footer */}
+            <div className="pt-3 mt-2 border-t border-border dark:border-zinc-800 flex gap-2">
+              <Link
+                href="/signin"
+                onClick={onCloseMobile}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-canvas hover:bg-surface border border-border text-ink text-xs font-semibold transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5 text-accent" />
+                <span>Sign In</span>
+              </Link>
+              <Link
+                href="/signup"
+                onClick={onCloseMobile}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-accent hover:bg-accent/90 text-white text-xs font-semibold shadow-sm transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Register</span>
+              </Link>
+            </div>
           </aside>
         </div>
       )}

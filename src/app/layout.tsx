@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import "./globals.css";
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -54,7 +56,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-canvas text-ink font-ui antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AuthGuard>{children}</AuthGuard>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
