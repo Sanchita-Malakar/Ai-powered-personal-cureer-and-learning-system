@@ -70,6 +70,7 @@ ALTER TABLE public.github_repositories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_github_connections ENABLE ROW LEVEL SECURITY;
 
 -- github_connections: Student can only view and manage their own connection
+DROP POLICY IF EXISTS "Users can manage their own github connection" ON public.github_connections;
 CREATE POLICY "Users can manage their own github connection"
     ON public.github_connections
     FOR ALL
@@ -78,12 +79,8 @@ CREATE POLICY "Users can manage their own github connection"
     WITH CHECK (auth.uid() = student_id);
 
 -- github_repositories: Student can only view their own permitted repositories
-CREATE POLICY "Users can view their own permitted repositories"
-    ON public.github_repositories
-    FOR SELECT
-    TO authenticated
-    USING (auth.uid() = student_id);
-
+DROP POLICY IF EXISTS "Users can view their own permitted repositories" ON public.github_repositories;
+DROP POLICY IF EXISTS "Users can manage their own permitted repositories" ON public.github_repositories;
 CREATE POLICY "Users can manage their own permitted repositories"
     ON public.github_repositories
     FOR ALL
@@ -92,6 +89,7 @@ CREATE POLICY "Users can manage their own permitted repositories"
     WITH CHECK (auth.uid() = student_id);
 
 -- project_github_connections: Student can only view and manage connections for their own projects
+DROP POLICY IF EXISTS "Users can manage their own project github connections" ON public.project_github_connections;
 CREATE POLICY "Users can manage their own project github connections"
     ON public.project_github_connections
     FOR ALL

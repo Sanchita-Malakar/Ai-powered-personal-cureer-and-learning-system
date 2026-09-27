@@ -77,6 +77,7 @@ CREATE INDEX IF NOT EXISTS idx_student_profiles_cgpa ON public.student_profiles(
 ALTER TABLE public.student_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Allow students to read only their own profile
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.student_profiles;
 CREATE POLICY "Users can view their own profile"
     ON public.student_profiles
     FOR SELECT
@@ -84,6 +85,7 @@ CREATE POLICY "Users can view their own profile"
     USING (auth.uid() = user_id);
 
 -- Allow students to insert their own profile
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.student_profiles;
 CREATE POLICY "Users can insert their own profile"
     ON public.student_profiles
     FOR INSERT
@@ -91,6 +93,7 @@ CREATE POLICY "Users can insert their own profile"
     WITH CHECK (auth.uid() = user_id);
 
 -- Allow students to update their own profile
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.student_profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.student_profiles
     FOR UPDATE
@@ -99,6 +102,7 @@ CREATE POLICY "Users can update their own profile"
     WITH CHECK (auth.uid() = user_id);
 
 -- Allow students to delete their own profile
+DROP POLICY IF EXISTS "Users can delete their own profile" ON public.student_profiles;
 CREATE POLICY "Users can delete their own profile"
     ON public.student_profiles
     FOR DELETE
