@@ -1,14 +1,26 @@
+import { VerifiedCountry, VerifiedCity, VerifiedUniversity } from "./location";
+import { VerificationStatus, ProficiencyLevel } from "./verification";
+
 export interface PersonalInfo {
   fullName: string;
   email: string;
   phone: string;
   degree: string;
-  college: string;
+  college: string; // Legacy fallback
   graduationYear: string;
-  locationCity: string;
+  locationCity: string; // Legacy fallback
   linkedInUrl: string;
   githubUrl: string;
   portfolioUrl: string;
+
+  // Verified & Normalized Reference Data:
+  country?: string; // e.g. "India"
+  countryCode?: string; // ISO Code e.g. "IN"
+  cityId?: string; // Unique city ID e.g. "city_in_kolkata"
+  cityDetails?: VerifiedCity;
+  universityId?: string; // Unique university ID e.g. "uni_in_ju"
+  universityDetails?: VerifiedUniversity;
+  locationNeedsConfirmation?: boolean;
 }
 
 export interface SubjectPerformance {
@@ -46,7 +58,14 @@ export interface SkillItem {
   id: string;
   name: string;
   category: "Programming" | "Development" | "AI/ML" | "Data" | "Cloud & DevOps" | "Other";
-  proficiency: SkillProficiency;
+  proficiency: SkillProficiency; // Student claimed level
+  isClaimed?: boolean;
+  isVerified?: boolean;
+  verifiedPercentage?: number; // 0-100 evidence-based percentage
+  verifiedLevel?: ProficiencyLevel;
+  evidenceProjectsCount?: number;
+  confidenceScore?: number;
+  lastVerifiedAt?: string;
 }
 
 export interface SkillsMatrix {
@@ -65,8 +84,14 @@ export interface ProjectItem {
   description: string;
   technologies: string[];
   liveUrl?: string;
-  githubUrl?: string;
+  githubUrl?: string; // Repository URL to inspect
   impactMetrics?: string; // e.g. "Processed 10k+ requests/day, 99.8% uptime"
+  verificationStatus?: VerificationStatus;
+  verificationScore?: number;
+  lastVerifiedAt?: string;
+  verifiedCommitSha?: string;
+  rootPath?: string; // Monorepo subdirectory e.g. "packages/client"
+  githubRepositoryId?: number;
 }
 
 export interface CertificationItem {
@@ -245,12 +270,34 @@ export const SAMPLE_ONBOARDED_STUDENT: CompleteStudentProfile = {
     email: "alex.rivera@university.edu",
     phone: "+91 98765 43210",
     degree: "B.Tech Computer Science & Engineering",
-    college: "National Institute of Technology (NIT)",
+    college: "National Institute of Technology Karnataka, Surathkal",
     graduationYear: "2025",
-    locationCity: "Bengaluru, India",
+    locationCity: "Bengaluru, Karnataka, India",
     linkedInUrl: "https://linkedin.com/in/alex-rivera",
     githubUrl: "https://github.com/alexrivera-dev",
     portfolioUrl: "https://alexrivera.dev",
+    country: "India",
+    countryCode: "IN",
+    cityId: "city_in_bengaluru",
+    cityDetails: {
+      id: "city_in_bengaluru",
+      name: "Bengaluru",
+      state: "Karnataka",
+      country: "India",
+      countryCode: "IN",
+    },
+    universityId: "uni_in_nit_surathkal",
+    universityDetails: {
+      id: "uni_in_nit_surathkal",
+      officialName: "National Institute of Technology Karnataka, Surathkal",
+      shortName: "NITK Surathkal",
+      city: "Mangaluru",
+      state: "Karnataka",
+      country: "India",
+      countryCode: "IN",
+      website: "https://www.nitk.ac.in",
+      institutionType: "Institute of National Importance",
+    },
   },
   academicProfile: {
     branch: "Computer Science & Engineering",

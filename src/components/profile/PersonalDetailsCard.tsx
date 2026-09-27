@@ -58,7 +58,7 @@ export const PersonalDetailsCard: React.FC<PersonalDetailsCardProps> = ({
             Full Legal Name
           </span>
           <p className="text-sm font-semibold text-ink truncate">
-            {personalInfo.fullName || "Alex Rivera"}
+            {personalInfo.fullName || "Student Name (Not set)"}
           </p>
         </div>
 
@@ -69,7 +69,7 @@ export const PersonalDetailsCard: React.FC<PersonalDetailsCardProps> = ({
             Academic Email
           </span>
           <p className="text-sm font-semibold text-ink truncate">
-            {personalInfo.email || "alex.rivera@university.edu"}
+            {personalInfo.email || "No email registered"}
           </p>
         </div>
 
@@ -80,29 +80,58 @@ export const PersonalDetailsCard: React.FC<PersonalDetailsCardProps> = ({
             Phone Number
           </span>
           <p className="text-sm font-semibold text-ink truncate">
-            {personalInfo.phone || "+91 98765 43210"}
+            {personalInfo.phone || "Not provided"}
           </p>
         </div>
 
-        {/* Location */}
+        {/* Current Location */}
         <div className="p-3.5 rounded-2xl bg-canvas/70 border border-border/60">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5 mb-1">
-            <MapPin className="w-3 h-3 text-accent" />
-            Current Location
-          </span>
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-accent" />
+              Current Location
+            </span>
+            {personalInfo.cityId ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 rounded-md">
+                Verified
+              </span>
+            ) : personalInfo.locationNeedsConfirmation ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded-md">
+                Re-confirm
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm font-semibold text-ink truncate">
-            {personalInfo.locationCity || "Bengaluru, India"}
+            {personalInfo.cityDetails?.name || personalInfo.locationCity || "Location not set"}
+          </p>
+          <p className="text-[11px] text-ink-muted truncate mt-0.5">
+            {personalInfo.cityDetails
+              ? `${personalInfo.cityDetails.state}, ${personalInfo.cityDetails.country}`
+              : personalInfo.country
+              ? `${personalInfo.country}`
+              : "Click Edit to set verified location"}
           </p>
         </div>
 
         {/* College & Degree */}
         <div className="p-3.5 rounded-2xl bg-canvas/70 border border-border/60">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5 mb-1">
-            <GraduationCap className="w-3 h-3 text-accent" />
-            Institution & Program
-          </span>
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1.5">
+              <GraduationCap className="w-3 h-3 text-accent" />
+              Institution & Program
+            </span>
+            {personalInfo.universityId ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 rounded-md">
+                Verified
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm font-semibold text-ink truncate">
-            {personalInfo.college || "NIT"} — {personalInfo.degree || "B.Tech CSE"}
+            {personalInfo.universityDetails?.officialName || personalInfo.college || "Institution not set"}
+          </p>
+          <p className="text-[11px] text-ink-muted truncate mt-0.5">
+            {personalInfo.degree || "Degree not set"}
+            {personalInfo.universityDetails?.city ? ` • ${personalInfo.universityDetails.city}` : ""}
           </p>
         </div>
 
@@ -113,7 +142,7 @@ export const PersonalDetailsCard: React.FC<PersonalDetailsCardProps> = ({
             Target Batch
           </span>
           <p className="text-sm font-semibold text-ink truncate">
-            Class of {personalInfo.graduationYear || "2025"} (Senior)
+            Class of {personalInfo.graduationYear || "2025"}
           </p>
         </div>
 

@@ -18,18 +18,36 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
   const { user, signOut, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("career_os_student_profile");
-      if (raw) {
-        try {
-          setOnboardedProfile(JSON.parse(raw));
-        } catch (e) {}
+    const loadCachedProfile = () => {
+      if (typeof window !== "undefined") {
+        const userKey = user?.id ? `career_os_student_profile_${user.id}` : "career_os_student_profile";
+        const raw = localStorage.getItem(userKey) || localStorage.getItem("career_os_student_profile");
+        if (raw) {
+          try {
+            setOnboardedProfile(JSON.parse(raw));
+          } catch (e) {}
+        }
       }
-    }
+    };
+
+    loadCachedProfile();
+
+    const handleProfileUpdate = (e: any) => {
+      if (e.detail) {
+        setOnboardedProfile(e.detail);
+      } else {
+        loadCachedProfile();
+      }
+    };
+
+    window.addEventListener("student-profile-updated", handleProfileUpdate);
+    return () => {
+      window.removeEventListener("student-profile-updated", handleProfileUpdate);
+    };
   }, [user]);
 
   const displayName =
-    user?.fullName || onboardedProfile?.personalInfo?.fullName || "Alex Rivera";
+    user?.fullName || onboardedProfile?.personalInfo?.fullName || (user?.email ? user.email.split("@")[0] : "Student");
   const displayEmail =
     user?.email || onboardedProfile?.personalInfo?.email || "student@university.edu";
   const displayPhone =
@@ -43,9 +61,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu }) => {
   const initials = displayName
     .split(" ")
     .map((n: string) => n[0])
+    .filter(Boolean)
     .join("")
     .slice(0, 2)
-    .toUpperCase() || "AR";
+    .toUpperCase() || "ST";
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-surface/85 backdrop-blur-md border-b border-border/80 dark:border-zinc-800 z-40 flex items-center justify-between px-3 sm:px-5 lg:px-6 transition-colors duration-200">

@@ -30,7 +30,8 @@ import {
   Sparkles,
   LayoutGrid,
 } from "lucide-react";
-import { CompleteStudentProfile, ProjectItem, CertificationItem, ExperienceItem } from "@/types/onboarding";
+import { CompleteStudentProfile, ProjectItem, CertificationItem, ExperienceItem, SkillItem, SkillsMatrix } from "@/types/onboarding";
+import { ProjectVerificationReport } from "@/types/verification";
 
 interface ProfileSectionProps {
   onBackToDashboard?: () => void;
@@ -43,6 +44,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
 }) => {
   const {
     profile,
+    currentUser,
     updatePersonalInfo,
     updateAcademicProfile,
     updateCareerPreferences,
@@ -58,6 +60,85 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editInitialTab, setEditInitialTab] = useState<"personal" | "academic" | "preferences">("personal");
   const [targetRoles, setTargetRoles] = useState<TargetRoleDetail[]>(DEFAULT_TARGET_ROLES);
+
+  // Propagate Project Verification Impacts to the Student Skills Matrix
+  const handleProjectVerified = (report: ProjectVerificationReport) => {
+    if (!report.skillImpacts || report.skillImpacts.length === 0) return;
+
+    const currentSkills = { ...profile.skills };
+
+    const updateSkillList = (list: SkillItem[] = []): SkillItem[] => {
+      return list.map((item) => {
+        const impact = report.skillImpacts.find(
+          (imp) => imp.skillName.toLowerCase().trim() === item.name.toLowerCase().trim()
+        );
+        if (impact) {
+          return {
+            ...item,
+            isVerified: true,
+            verifiedPercentage: impact.newPercentage,
+            verifiedLevel: impact.newLevel,
+            evidenceProjectsCount: (item.evidenceProjectsCount || 0) + 1,
+            lastVerifiedAt: report.verifiedAt,
+          };
+        }
+        return item;
+      });
+    };
+
+    const updatedProgramming = updateSkillList(currentSkills.programming);
+    const updatedDevelopment = updateSkillList(currentSkills.development);
+    const updatedAiMl = updateSkillList(currentSkills.aiMl);
+    const updatedData = updateSkillList(currentSkills.data);
+    const updatedCloud = updateSkillList(currentSkills.cloudDevOps);
+
+    // If an impact skill was not previously in the student's list, add it as verified
+    const allKnownNames = [
+      ...updatedProgramming,
+      ...updatedDevelopment,
+      ...updatedAiMl,
+      ...updatedData,
+      ...updatedCloud,
+    ].map((s) => s.name.toLowerCase().trim());
+
+    for (const impact of report.skillImpacts) {
+      if (!allKnownNames.includes(impact.skillName.toLowerCase().trim())) {
+        const detected = report.detectedTechnologies.find(
+          (t) => t.name.toLowerCase() === impact.skillName.toLowerCase()
+        );
+
+        const newSkill: SkillItem = {
+          id: `skill-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: impact.skillName,
+          category: detected?.category === "Language" ? "Programming" : "Development",
+          proficiency: "Intermediate",
+          isClaimed: true,
+          isVerified: true,
+          verifiedPercentage: impact.newPercentage,
+          verifiedLevel: impact.newLevel,
+          evidenceProjectsCount: 1,
+          lastVerifiedAt: report.verifiedAt,
+        };
+
+        if (detected?.category === "Language") {
+          updatedProgramming.push(newSkill);
+        } else {
+          updatedDevelopment.push(newSkill);
+        }
+      }
+    }
+
+    const nextSkills: SkillsMatrix = {
+      ...currentSkills,
+      programming: updatedProgramming,
+      development: updatedDevelopment,
+      aiMl: updatedAiMl,
+      data: updatedData,
+      cloudDevOps: updatedCloud,
+    };
+
+    updateSkills(nextSkills);
+  };
 
   const tabs = [
     { id: "all" as const, label: "All Details", icon: LayoutGrid },
@@ -232,6 +313,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
             skills={profile.skills}
             onUpdateSkills={updateSkills}
             onEdit={() => handleOpenEdit("preferences")}
+            userId={currentUser?.id}
           />
         )}
 
@@ -249,7 +331,16 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
         {(activeTab === "all" || activeTab === "projects") && (
           <ProjectsCard
             projects={profile.projects}
-            onAddProject={handleAddProject}
+            onUpdateProjects={updateProjects}
+            onProjectVerified={handleProjectVerified}
+            existingSkills={[
+              ...(profile.skills.programming || []),
+              ...(profile.skills.development || []),
+              ...(profile.skills.aiMl || []),
+              ...(profile.skills.data || []),
+              ...(profile.skills.cloudDevOps || []),
+            ]}
+            userId={currentUser?.id}
             onEdit={() => handleOpenEdit("preferences")}
           />
         )}

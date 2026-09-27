@@ -28,6 +28,13 @@ An intelligent, deterministic student career acceleration platform designed to b
 
 ---
 
+## 🌐 Live Production Deployment
+
+- **Production App**: [https://ai-powered-personal-cureer-and-lear.vercel.app](https://ai-powered-personal-cureer-and-lear.vercel.app)
+- **Deployment Platform**: Vercel
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -35,7 +42,7 @@ An intelligent, deterministic student career acceleration platform designed to b
 - Node.js (v18 or newer recommended)
 - npm or yarn
 
-### Installation
+### Local Installation & Development
 
 1. Clone the repository:
    ```bash
@@ -48,12 +55,27 @@ An intelligent, deterministic student career acceleration platform designed to b
    npm install
    ```
 
-3. Start the development server:
+3. Configure environment variables in `.env.local`:
+   ```bash
+   NEXT_PUBLIC_APP_URL="https://ai-powered-personal-cureer-and-lear.vercel.app"
+   NEXT_PUBLIC_SUPABASE_URL="https://ksilwfcitxibstosdiqu.supabase.co"
+   NEXT_PUBLIC_SUPABASE_ANON_KEY="..."
+   # GitHub App Production Credentials
+   GITHUB_APP_ID="..."
+   GITHUB_APP_SLUG="..."
+   GITHUB_APP_CLIENT_ID="..."
+   GITHUB_APP_CLIENT_SECRET="..."
+   GITHUB_APP_PRIVATE_KEY="..."
+   GITHUB_WEBHOOK_SECRET="..."
+   GEMINI_API_KEY="..."
+   ```
+
+4. Start the development server:
    ```bash
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser. All student features are immediately accessible with zero login barriers.
+5. Open [http://localhost:3000](http://localhost:3000) for local development, or access the live app directly at [https://ai-powered-personal-cureer-and-lear.vercel.app](https://ai-powered-personal-cureer-and-lear.vercel.app).
 
 ---
 

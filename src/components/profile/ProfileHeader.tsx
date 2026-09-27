@@ -63,21 +63,21 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-ink tracking-tight">
-                {personalInfo.fullName || "Alex Rivera"}
+                {personalInfo.fullName || "Student Profile"}
               </h1>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-accent/10 text-accent border border-accent/20">
                 <Sparkles className="w-3 h-3" />
-                {careerPreferences.primaryRole || "AI/ML Engineer"}
+                {careerPreferences.primaryRole || "Target Career Trajectory"}
               </span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Placement Ready
+                {personalInfo.cityId && personalInfo.universityId ? "Verified Profile" : "Profile Active"}
               </span>
             </div>
 
             <p className="text-xs sm:text-sm text-ink-muted flex flex-wrap items-center gap-y-1 gap-x-3">
               <span className="flex items-center gap-1">
                 <GraduationCap className="w-3.5 h-3.5 text-ink-muted" />
-                {personalInfo.college || "NIT"} • {academicProfile.semester || "Semester 7"}
+                {personalInfo.college || "Institution Unassigned"} • {academicProfile.semester || "Semester 1"}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
@@ -87,7 +87,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <span>•</span>
               <span className="flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-ink-muted" />
-                {personalInfo.locationCity || "Bengaluru, India"}
+                {personalInfo.locationCity || "Location not set"}
               </span>
             </p>
 

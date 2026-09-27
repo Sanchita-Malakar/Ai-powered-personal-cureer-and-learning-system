@@ -21,10 +21,13 @@ interface EducationCardProps {
 
 export const EducationCard: React.FC<EducationCardProps> = ({
   academicProfile,
-  degreeName = "B.Tech Computer Science & Engineering",
-  collegeName = "National Institute of Technology (NIT)",
+  degreeName,
+  collegeName,
   onEdit,
 }) => {
+  const displayDegree = degreeName || "Degree / Program not set";
+  const displayCollege = collegeName || "Institution not set";
+
   return (
     <div className="rounded-3xl bg-surface border border-border/80 p-6 shadow-xs hover:border-border transition-all">
       <div className="flex items-center justify-between gap-3 mb-5">
@@ -57,14 +60,22 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           </span>
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl font-black text-ink">
-              {academicProfile.cgpa || "8.85"}
+              {academicProfile.cgpa || "—"}
             </span>
-            <span className="text-xs font-semibold text-ink-muted">/ 10.0</span>
+            {academicProfile.cgpa && (
+              <span className="text-xs font-semibold text-ink-muted">
+                / {academicProfile.gradingScale || "10.0"}
+              </span>
+            )}
           </div>
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500 mt-1">
-            <Award className="w-3 h-3" />
-            Top 5% of Department
-          </span>
+          {academicProfile.cgpa ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500 mt-1">
+              <Award className="w-3 h-3" />
+              Verified Benchmark
+            </span>
+          ) : (
+            <span className="text-[11px] text-ink-muted mt-1 block">Click Edit to add CGPA</span>
+          )}
         </div>
 
         {/* Semester */}
@@ -73,9 +84,11 @@ export const EducationCard: React.FC<EducationCardProps> = ({
             Academic Status
           </span>
           <span className="text-2xl font-black text-ink block">
-            {academicProfile.semester || "Semester 7"}
+            {academicProfile.semester || "Semester 1"}
           </span>
-          <span className="text-[11px] text-ink-muted">Final Year Senior</span>
+          <span className="text-[11px] text-ink-muted truncate block">
+            {academicProfile.branch || "Enrolled Student"}
+          </span>
         </div>
 
         {/* 10th & 12th Board */}
@@ -86,11 +99,11 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           <div className="space-y-0.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-ink-muted font-medium">10th:</span>
-              <span className="font-bold text-ink">{academicProfile.tenthPercentage || "94.2%"}</span>
+              <span className="font-bold text-ink">{academicProfile.tenthPercentage || "—"}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-ink-muted font-medium">12th:</span>
-              <span className="font-bold text-ink">{academicProfile.twelfthPercentage || "91.8%"}</span>
+              <span className="font-bold text-ink">{academicProfile.twelfthPercentage || "—"}</span>
             </div>
           </div>
         </div>
@@ -100,12 +113,20 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
             Backlog Status
           </span>
-          <span className="text-2xl font-black text-emerald-500 block">
+          <span
+            className={`text-2xl font-black block ${
+              academicProfile.activeBacklogs === "0" ? "text-emerald-500" : "text-amber-500"
+            }`}
+          >
             {academicProfile.activeBacklogs || "0"}
           </span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500">
+          <span
+            className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+              academicProfile.activeBacklogs === "0" ? "text-emerald-500" : "text-amber-500"
+            }`}
+          >
             <ShieldCheck className="w-3 h-3" />
-            100% Eligible for Tier-1
+            {academicProfile.activeBacklogs === "0" ? "Clear / Eligible" : "Backlog Pending"}
           </span>
         </div>
       </div>
@@ -117,14 +138,14 @@ export const EducationCard: React.FC<EducationCardProps> = ({
             Registered Degree & Branch
           </span>
           <h4 className="text-base font-bold text-ink mt-0.5">
-            {degreeName}
+            {displayDegree}
           </h4>
           <p className="text-xs text-ink-muted">
-            {collegeName} • Affiliated with National Board of Accreditation
+            {displayCollege}
           </p>
         </div>
         <span className="self-start sm:self-center px-3 py-1 rounded-full text-xs font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
-          Graduation: May 2025
+          {academicProfile.semester || "Semester 1"}
         </span>
       </div>
 
