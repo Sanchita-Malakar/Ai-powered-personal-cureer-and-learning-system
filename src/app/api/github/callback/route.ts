@@ -4,7 +4,7 @@ import {
   getInstallationDetails,
   getInstallationRepositories,
 } from "@/lib/verification/githubAppAuth";
-import { saveStudentGithubInstallation } from "@/lib/supabaseServer";
+import { saveStudentGithubInstallation, getAuthenticatedStudent } from "@/lib/supabaseServer";
 import { getRequestOrigin } from "@/lib/appUrl";
 
 export async function GET(request: NextRequest) {
@@ -24,21 +24,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/#profile?github_error=invalid_installation_id`);
   }
 
-  // Verify CSRF HMAC state token strictly to bind installation to the authenticated student
-  if (!state) {
-    return NextResponse.redirect(
-      `${origin}/#profile?github_error=${encodeURIComponent("Missing authorization state token. Please initiate connection from CareerOS.")}`
-    );
+  let studentId: string | null = null;
+
+  // 1. Verify CSRF HMAC state token if provided
+  if (state) {
+    const verified = verifyStateToken(state);
+    if (verified.isValid && verified.userId) {
+      studentId = verified.userId;
+    }
   }
 
-  const verified = verifyStateToken(state);
-  if (!verified.isValid || !verified.userId) {
-    return NextResponse.redirect(
-      `${origin}/#profile?github_error=${encodeURIComponent("Invalid or expired authorization state. Please try connecting again.")}`
-    );
+  // 2. Fallback: derive student identity from the authenticated browser session (e.g. if installed from GitHub directly)
+  if (!studentId) {
+    const student = await getAuthenticatedStudent(request);
+    if (student) {
+      studentId = student.id;
+    }
   }
 
-  const studentId = verified.userId;
+  if (!studentId) {
+    return NextResponse.redirect(
+      `${origin}/#profile?github_error=${encodeURIComponent("Authentication required. Please sign in to CareerOS to link your GitHub installation.")}`
+    );
+  }
 
   try {
     // 1. Fetch Installation Details from GitHub API using GitHub App JWT
