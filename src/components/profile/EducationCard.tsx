@@ -51,65 +51,130 @@ export const EducationCard: React.FC<EducationCardProps> = ({
   const [scanningMessage, setScanningMessage] = useState<string>("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [lastExtractedNotice, setLastExtractedNotice] = useState<string | null>(null);
+  const [dragActiveType, setDragActiveType] = useState<ScorecardDocumentType | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  // Synchronous refs to prevent React state closure race conditions during file selection
+  const targetDocTypeRef = useRef<ScorecardDocumentType>("secondary");
+  const targetSemesterRef = useRef<number>(6);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const displayDegree = degreeName || academicProfile.degreeName || "Degree / Program not set";
   const displayCollege = collegeName || academicProfile.collegeName || "Institution not set";
   const uploadedDocs = academicProfile.uploadedScorecards || [];
 
-  // Helper to trigger hidden file input
-  const handleTriggerUpload = (type: ScorecardDocumentType) => {
+  // Helper to compress image in browser to prevent Vercel 4.5MB payload limit errors
+  const compressImageIfNeeded = async (file: File): Promise<File> => {
+    if (!file.type.startsWith("image/")) return file;
+    if (file.size < 1.2 * 1024 * 1024) return file;
+
+    return new Promise<File>((resolve) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const maxDim = 1800;
+            let width = img.width;
+            let height = img.height;
+            if (width > height && width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(file);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(
+              (blob) => {
+                if (blob && blob.size < file.size) {
+                  const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                    type: "image/jpeg",
+                    lastModified: Date.now(),
+                  });
+                  resolve(compressed);
+                } else {
+                  resolve(file);
+                }
+              },
+              "image/jpeg",
+              0.85
+            );
+          } catch {
+            resolve(file);
+          }
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Helper to trigger hidden file input with synchronous docType lock
+  const handleTriggerUpload = (type: ScorecardDocumentType, sem?: number) => {
+    targetDocTypeRef.current = type;
+    if (sem !== undefined) targetSemesterRef.current = sem;
     setActiveUploadTab(type);
     setUploadError(null);
     setLastExtractedNotice(null);
+
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
       fileInputRef.current.click();
     }
   };
 
-  // Process chosen PDF/Image scorecard
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 15 * 1024 * 1024) {
-      setUploadError("Document size must be less than 15 MB.");
+  // Core processing function handling FormData upload & AI extraction
+  const processScorecardUpload = async (
+    file: File,
+    docType: ScorecardDocumentType,
+    semNumber?: number
+  ) => {
+    if (file.size > 12 * 1024 * 1024) {
+      setUploadError(`Document size is ${(file.size / (1024 * 1024)).toFixed(1)} MB. Please upload a document under 12 MB.`);
       return;
     }
 
     setIsScanning(true);
     setUploadError(null);
     setLastExtractedNotice(null);
-    setScanningMessage(`Uploading ${file.name}...`);
+    setScanningMessage(`Preparing ${file.name}...`);
 
     try {
-      // 1. Read file to Base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const res = reader.result as string;
-          const base64Data = res.split(",")[1] || "";
-          resolve(base64Data);
-        };
-        reader.onerror = reject;
-      });
-      reader.readAsDataURL(file);
-      const fileBase64 = await base64Promise;
+      let fileToUpload = file;
+      if (file.type.startsWith("image/")) {
+        setScanningMessage("Optimizing image resolution for OCR extraction...");
+        fileToUpload = await compressImageIfNeeded(file);
+      } else if (file.size > 4.4 * 1024 * 1024) {
+        throw new Error(
+          `PDF size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds 4.4 MB limit. Please compress your PDF or upload a photo/image of the marksheet.`
+        );
+      }
 
-      setScanningMessage("AI Document OCR: Reading seals, marks & courses...");
+      setScanningMessage("AI Document OCR: Reading seals, marks & coursework...");
 
-      // 2. Call backend analyzer API
+      // Send as FormData directly to avoid 33% base64 JSON payload overhead
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("documentType", docType);
+      const targetSem = docType === "semester" ? semNumber || targetSemesterRef.current || selectedSemester : undefined;
+      if (targetSem !== undefined) {
+        formData.append("semesterNumber", String(targetSem));
+      }
+
       const res = await fetch("/api/education/analyze-scorecard", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileBase64,
-          fileName: file.name,
-          documentType: activeUploadTab,
-          semesterNumber: activeUploadTab === "semester" ? selectedSemester : undefined,
-        }),
+        body: formData,
       });
 
       const data = await res.json();
@@ -120,16 +185,20 @@ export const EducationCard: React.FC<EducationCardProps> = ({
       const extracted: ExtractedScorecardData = data.extractedData;
       setScanningMessage("Integrating extracted academic credentials...");
 
-      // 3. Construct new UploadedScorecardDoc record
+      const finalSem = docType === "semester" ? extracted.semesterNumber || targetSem : undefined;
+
+      // Construct verified document record
       const newDoc: UploadedScorecardDoc = {
         id: `doc-${Date.now()}`,
-        type: activeUploadTab,
+        type: docType,
         title:
-          activeUploadTab === "secondary"
+          docType === "secondary"
             ? "Class 10 (Secondary) Marksheet"
-            : activeUploadTab === "higher_secondary"
+            : docType === "higher_secondary"
             ? "Class 12 (Higher Secondary) Marksheet"
-            : `Semester ${extracted.semesterNumber || selectedSemester} Scorecard`,
+            : docType === "diploma"
+            ? "Polytechnic / Diploma Marksheet"
+            : `Semester ${finalSem} Scorecard`,
         fileName: file.name,
         fileSize: `${(file.size / 1024).toFixed(1)} KB`,
         uploadedAt: new Date().toLocaleDateString("en-US", {
@@ -137,12 +206,12 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           day: "numeric",
           year: "numeric",
         }),
-        semesterNumber: activeUploadTab === "semester" ? extracted.semesterNumber || selectedSemester : undefined,
+        semesterNumber: finalSem,
         extractedData: extracted,
         isVerified: true,
       };
 
-      // 4. Update AcademicProfile with extracted fields
+      // Construct updated academic profile
       const updatedProfile: AcademicProfile = {
         ...academicProfile,
         isVerifiedFromDocuments: true,
@@ -151,8 +220,8 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           ...uploadedDocs.filter(
             (d) =>
               !(
-                d.type === activeUploadTab &&
-                (activeUploadTab !== "semester" || d.semesterNumber === newDoc.semesterNumber)
+                d.type === docType &&
+                (docType !== "semester" || d.semesterNumber === newDoc.semesterNumber)
               )
           ),
           newDoc,
@@ -161,27 +230,35 @@ export const EducationCard: React.FC<EducationCardProps> = ({
 
       let successMsg = "";
 
-      if (activeUploadTab === "secondary") {
+      if (docType === "secondary") {
         if (extracted.percentage) updatedProfile.tenthPercentage = extracted.percentage;
         if (extracted.boardOrUniversity) updatedProfile.tenthBoard = extracted.boardOrUniversity;
         if (extracted.institutionName) updatedProfile.tenthSchool = extracted.institutionName;
         if (extracted.passingYear) updatedProfile.tenthPassingYear = extracted.passingYear;
-        successMsg = `Class 10 Marksheet verified! Extracted ${extracted.percentage || "results"} from ${extracted.boardOrUniversity || "Board"}.`;
-      } else if (activeUploadTab === "higher_secondary") {
+        successMsg = `Class 10 Marksheet verified! Extracted ${extracted.percentage || "score"} from ${extracted.boardOrUniversity || "Board"}.`;
+      } else if (docType === "higher_secondary") {
         if (extracted.percentage) updatedProfile.twelfthPercentage = extracted.percentage;
         if (extracted.boardOrUniversity) updatedProfile.twelfthBoard = extracted.boardOrUniversity;
         if (extracted.institutionName) updatedProfile.twelfthSchool = extracted.institutionName;
         if (extracted.degreeOrStream) updatedProfile.twelfthStream = extracted.degreeOrStream;
         if (extracted.passingYear) updatedProfile.twelfthPassingYear = extracted.passingYear;
-        successMsg = `Class 12 Marksheet verified! Extracted ${extracted.percentage || "results"} (${extracted.degreeOrStream || "Stream"}).`;
+        successMsg = `Class 12 Marksheet verified! Extracted ${extracted.percentage || "score"} (${extracted.degreeOrStream || "Stream"}).`;
+      } else if (docType === "diploma") {
+        updatedProfile.hasDiploma = true;
+        if (extracted.percentage) updatedProfile.diplomaPercentage = extracted.percentage;
+        if (extracted.boardOrUniversity) updatedProfile.diplomaBoard = extracted.boardOrUniversity;
+        if (extracted.institutionName) updatedProfile.diplomaCollege = extracted.institutionName;
+        if (extracted.branch || extracted.degreeOrStream) updatedProfile.diplomaBranch = extracted.branch || extracted.degreeOrStream;
+        if (extracted.passingYear) updatedProfile.diplomaPassingYear = extracted.passingYear;
+        successMsg = `Diploma / Polytechnic Marksheet verified! Extracted ${extracted.percentage || "score"} from ${extracted.boardOrUniversity || "Technical Board"}.`;
       } else {
         // Semester Scorecard
         if (extracted.cgpa) updatedProfile.cgpa = extracted.cgpa;
-        if (extracted.semesterNumber) updatedProfile.semester = `Semester ${extracted.semesterNumber}`;
+        if (finalSem) updatedProfile.semester = `Semester ${finalSem}`;
         if (extracted.branch) updatedProfile.branch = extracted.branch;
         if (extracted.activeBacklogs) updatedProfile.activeBacklogs = extracted.activeBacklogs;
 
-        // If subjects were extracted, merge them with existing subjects
+        // Merge coursework subjects
         if (extracted.subjects && extracted.subjects.length > 0) {
           const existingMap = new Map((academicProfile.subjects || []).map((s) => [s.name.toLowerCase(), s]));
           extracted.subjects.forEach((sub) => {
@@ -193,13 +270,12 @@ export const EducationCard: React.FC<EducationCardProps> = ({
         if (extracted.degreeOrStream) updatedProfile.degreeName = extracted.degreeOrStream;
         if (extracted.institutionName) updatedProfile.collegeName = extracted.institutionName;
 
-        // Also update parent personalInfo if college/degree detected
         if (onUpdatePersonalInfo) {
           if (extracted.institutionName) onUpdatePersonalInfo({ college: extracted.institutionName });
           if (extracted.degreeOrStream) onUpdatePersonalInfo({ degree: extracted.degreeOrStream });
         }
 
-        successMsg = `Semester ${extracted.semesterNumber || selectedSemester} Scorecard verified! CGPA: ${
+        successMsg = `Semester ${finalSem} Scorecard verified! CGPA: ${
           extracted.cgpa || academicProfile.cgpa || "Updated"
         }, SGPA: ${extracted.sgpa || "N/A"}, ${extracted.subjects?.length || 0} Coursework subjects synced.`;
       }
@@ -216,6 +292,14 @@ export const EducationCard: React.FC<EducationCardProps> = ({
       setIsScanning(false);
       setScanningMessage("");
     }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const docType = targetDocTypeRef.current;
+    const sem = targetSemesterRef.current;
+    processScorecardUpload(file, docType, sem);
   };
 
   const handleRemoveDoc = (docId: string) => {
@@ -251,6 +335,7 @@ export const EducationCard: React.FC<EducationCardProps> = ({
   // Find documents per category
   const secondaryDoc = uploadedDocs.find((d) => d.type === "secondary");
   const higherSecDoc = uploadedDocs.find((d) => d.type === "higher_secondary");
+  const diplomaDoc = uploadedDocs.find((d) => d.type === "diploma");
   const semesterDocs = uploadedDocs.filter((d) => d.type === "semester");
 
   return (
@@ -259,9 +344,9 @@ export const EducationCard: React.FC<EducationCardProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,application/pdf,image/png,image/jpeg"
+        accept=".pdf,application/pdf,image/png,image/jpeg,image/jpg,image/webp"
         className="hidden"
-        onChange={handleFileChange}
+        onChange={handleFileInputChange}
       />
 
       {/* Header */}
@@ -281,7 +366,7 @@ export const EducationCard: React.FC<EducationCardProps> = ({
               )}
             </div>
             <p className="text-xs text-ink-muted">
-              Upload Secondary, Higher Secondary, and Semester scorecards for instant AI extraction, with manual editing anytime.
+              Upload Secondary (10th), Higher Secondary (12th), Diploma (Polytechnic), and Semester scorecards for automated AI extraction, or edit manually anytime.
             </p>
           </div>
         </div>
@@ -396,17 +481,17 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           </span>
         </div>
 
-        {/* 10th & 12th Boards */}
+        {/* School & Diploma Boards */}
         <div className="p-4 rounded-2xl bg-canvas/70 border border-border/60 relative group">
           <button
             onClick={() => setEditModalOpen(true)}
             className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-ink-muted hover:text-accent"
-            title="Edit School Boards"
+            title="Edit School & Diploma Boards"
           >
             <Edit3 className="w-3 h-3" />
           </button>
           <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
-            School Boards
+            School & Diploma
           </span>
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs">
@@ -421,6 +506,14 @@ export const EducationCard: React.FC<EducationCardProps> = ({
                 {academicProfile.twelfthPercentage || "—"}
               </span>
             </div>
+            {(academicProfile.diplomaPercentage || academicProfile.hasDiploma || diplomaDoc) && (
+              <div className="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400">
+                <span className="font-medium">Diploma:</span>
+                <span className="font-bold">
+                  {academicProfile.diplomaPercentage || "Verified"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -464,12 +557,17 @@ export const EducationCard: React.FC<EducationCardProps> = ({
           <p className="text-xs text-ink-muted">{displayCollege}</p>
         </div>
         <div className="flex items-center gap-2">
+          {academicProfile.hasDiploma && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+              Lateral Entry / Diploma
+            </span>
+          )}
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30">
             {academicProfile.semester || "Semester 1"}
           </span>
           <button
             onClick={() => setEditModalOpen(true)}
-            className="p-1.5 rounded-lg bg-surface border border-border/80 text-ink hover:text-accent"
+            className="p-1.5 rounded-lg bg-surface border border-border/80 text-ink hover:text-accent cursor-pointer"
             title="Edit degree details"
           >
             <Edit3 className="w-3.5 h-3.5" />
@@ -486,13 +584,30 @@ export const EducationCard: React.FC<EducationCardProps> = ({
             <UploadCloud className="w-4 h-4 text-accent" />
             <h4 className="text-sm font-bold text-ink">Scorecard & Marksheet Document Verification Hub</h4>
           </div>
-          <span className="text-[11px] text-ink-muted">PDF or high-res image (max 15MB)</span>
+          <span className="text-[11px] text-ink-muted">PDF or high-res image (drag & drop or click upload)</span>
         </div>
 
-        {/* 3 Upload Categories Tabs */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* 4 Upload Categories: 10th, 12th, Diploma (Polytechnic), and Semester */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* 1. Secondary (10th) Card */}
-          <div className="p-4 rounded-xl bg-surface border border-border/80 flex flex-col justify-between space-y-3">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActiveType("secondary");
+            }}
+            onDragLeave={() => setDragActiveType(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActiveType(null);
+              const f = e.dataTransfer.files?.[0];
+              if (f) processScorecardUpload(f, "secondary");
+            }}
+            className={`p-4 rounded-xl bg-surface border transition-all flex flex-col justify-between space-y-3 ${
+              dragActiveType === "secondary"
+                ? "border-accent ring-2 ring-accent/20 bg-accent/5"
+                : "border-border/80 hover:border-border"
+            }`}
+          >
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-ink">Class 10 (Secondary)</span>
@@ -505,7 +620,7 @@ export const EducationCard: React.FC<EducationCardProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-ink-muted mt-1">
-                Extracts 10th board name, school, passing year, and percentage.
+                Extracts 10th board, school, passing year, and percentage.
               </p>
 
               {secondaryDoc ? (
@@ -516,7 +631,7 @@ export const EducationCard: React.FC<EducationCardProps> = ({
                     </span>
                     <button
                       onClick={() => handleRemoveDoc(secondaryDoc.id)}
-                      className="text-ink-muted hover:text-red-500 p-0.5"
+                      className="text-ink-muted hover:text-red-500 p-0.5 cursor-pointer"
                       title="Remove document"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -536,15 +651,32 @@ export const EducationCard: React.FC<EducationCardProps> = ({
               className="w-full py-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-accent/20 disabled:opacity-50"
             >
               <FileUp className="w-3.5 h-3.5" />
-              <span>{secondaryDoc ? "Re-upload 10th Marksheet" : "Upload 10th Marksheet"}</span>
+              <span>{secondaryDoc ? "Re-upload 10th" : "Upload 10th Marksheet"}</span>
             </button>
           </div>
 
           {/* 2. Higher Secondary (12th) Card */}
-          <div className="p-4 rounded-xl bg-surface border border-border/80 flex flex-col justify-between space-y-3">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActiveType("higher_secondary");
+            }}
+            onDragLeave={() => setDragActiveType(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActiveType(null);
+              const f = e.dataTransfer.files?.[0];
+              if (f) processScorecardUpload(f, "higher_secondary");
+            }}
+            className={`p-4 rounded-xl bg-surface border transition-all flex flex-col justify-between space-y-3 ${
+              dragActiveType === "higher_secondary"
+                ? "border-accent ring-2 ring-accent/20 bg-accent/5"
+                : "border-border/80 hover:border-border"
+            }`}
+          >
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink">Class 12 (Higher Secondary)</span>
+                <span className="text-xs font-bold text-ink">Class 12 (Higher Sec)</span>
                 {higherSecDoc ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     ✓ Verified
@@ -565,7 +697,7 @@ export const EducationCard: React.FC<EducationCardProps> = ({
                     </span>
                     <button
                       onClick={() => handleRemoveDoc(higherSecDoc.id)}
-                      className="text-ink-muted hover:text-red-500 p-0.5"
+                      className="text-ink-muted hover:text-red-500 p-0.5 cursor-pointer"
                       title="Remove document"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -585,12 +717,97 @@ export const EducationCard: React.FC<EducationCardProps> = ({
               className="w-full py-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-accent/20 disabled:opacity-50"
             >
               <FileUp className="w-3.5 h-3.5" />
-              <span>{higherSecDoc ? "Re-upload 12th Marksheet" : "Upload 12th Marksheet"}</span>
+              <span>{higherSecDoc ? "Re-upload 12th" : "Upload 12th Marksheet"}</span>
             </button>
           </div>
 
-          {/* 3. Semester Scorecards Card */}
-          <div className="p-4 rounded-xl bg-surface border border-border/80 flex flex-col justify-between space-y-3">
+          {/* 3. Diploma / Polytechnic (Optional / Lateral Entry) Card */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActiveType("diploma");
+            }}
+            onDragLeave={() => setDragActiveType(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActiveType(null);
+              const f = e.dataTransfer.files?.[0];
+              if (f) processScorecardUpload(f, "diploma");
+            }}
+            className={`p-4 rounded-xl bg-surface border transition-all flex flex-col justify-between space-y-3 ${
+              dragActiveType === "diploma"
+                ? "border-purple-500 ring-2 ring-purple-500/20 bg-purple-500/5"
+                : "border-border/80 hover:border-border"
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-ink">Diploma / Polytechnic</span>
+                {diplomaDoc ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    ✓ Verified
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
+                    Optional
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-ink-muted mt-1">
+                For 3-year diploma or lateral entry (WBSCTE, MSBTE, BTEUP). Extracts stream & aggregate.
+              </p>
+
+              {diplomaDoc ? (
+                <div className="mt-3 p-2.5 rounded-lg bg-canvas border border-border/60 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-ink truncate max-w-[120px]">
+                      {diplomaDoc.fileName}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveDoc(diplomaDoc.id)}
+                      className="text-ink-muted hover:text-red-500 p-0.5 cursor-pointer"
+                      title="Remove document"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-ink-muted">
+                    {academicProfile.diplomaBoard || "Polytechnic Council"} •{" "}
+                    <strong className="text-ink">{academicProfile.diplomaPercentage || "Score"}</strong>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              onClick={() => handleTriggerUpload("diploma")}
+              disabled={isScanning}
+              className="w-full py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-600 dark:text-purple-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-purple-500/30 disabled:opacity-50"
+            >
+              <FileUp className="w-3.5 h-3.5" />
+              <span>{diplomaDoc ? "Re-upload Diploma" : "Upload Diploma Marksheet"}</span>
+            </button>
+          </div>
+
+          {/* 4. Semester Scorecards Card */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActiveType("semester");
+            }}
+            onDragLeave={() => setDragActiveType(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActiveType(null);
+              const f = e.dataTransfer.files?.[0];
+              if (f) processScorecardUpload(f, "semester", selectedSemester);
+            }}
+            className={`p-4 rounded-xl bg-surface border transition-all flex flex-col justify-between space-y-3 ${
+              dragActiveType === "semester"
+                ? "border-accent ring-2 ring-accent/20 bg-accent/5"
+                : "border-border/80 hover:border-border"
+            }`}
+          >
             <div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-ink">Semester Scorecards</span>
@@ -607,8 +824,12 @@ export const EducationCard: React.FC<EducationCardProps> = ({
                 <span className="text-[10px] text-ink-muted font-semibold">Semester:</span>
                 <select
                   value={selectedSemester}
-                  onChange={(e) => setSelectedSemester(Number(e.target.value))}
-                  className="px-2 py-1 rounded-lg bg-canvas border border-border text-[11px] font-bold text-ink"
+                  onChange={(e) => {
+                    const s = Number(e.target.value);
+                    setSelectedSemester(s);
+                    targetSemesterRef.current = s;
+                  }}
+                  className="px-2 py-1 rounded-lg bg-canvas border border-border text-[11px] font-bold text-ink cursor-pointer"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                     <option key={s} value={s}>
@@ -631,7 +852,7 @@ export const EducationCard: React.FC<EducationCardProps> = ({
                       </span>
                       <button
                         onClick={() => handleRemoveDoc(doc.id)}
-                        className="text-ink-muted hover:text-red-500"
+                        className="text-ink-muted hover:text-red-500 cursor-pointer"
                         title="Remove"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -643,12 +864,11 @@ export const EducationCard: React.FC<EducationCardProps> = ({
             </div>
 
             <button
-              onClick={() => handleTriggerUpload("semester")}
+              onClick={() => handleTriggerUpload("semester", selectedSemester)}
               disabled={isScanning}
               className="w-full py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-600 dark:text-purple-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-purple-500/30 disabled:opacity-50"
             >
               <FileUp className="w-3.5 h-3.5" />
-              <span>Upload Sem {selectedSemester} Scorecard</span>
             </button>
           </div>
         </div>

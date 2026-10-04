@@ -31,7 +31,7 @@ export interface SubjectPerformance {
   credits?: number;
 }
 
-export type ScorecardDocumentType = "secondary" | "higher_secondary" | "semester";
+export type ScorecardDocumentType = "secondary" | "higher_secondary" | "diploma" | "semester";
 
 export interface ExtractedScorecardData {
   documentType: ScorecardDocumentType;
@@ -90,6 +90,12 @@ export interface AcademicProfile {
   twelfthSchool?: string;
   twelfthStream?: string;
   twelfthPassingYear?: string;
+  hasDiploma?: boolean;
+  diplomaPercentage?: string;
+  diplomaBoard?: string; // e.g. WBSCTE, MSBTE, BTEUP
+  diplomaCollege?: string;
+  diplomaBranch?: string; // e.g. Diploma in Computer Science & Technology
+  diplomaPassingYear?: string;
   degreeName?: string;
   collegeName?: string;
   graduationYear?: string;
@@ -228,6 +234,12 @@ export const DEFAULT_STUDENT_PROFILE: CompleteStudentProfile = {
     gradingScale: "10.0",
     tenthPercentage: "",
     twelfthPercentage: "",
+    hasDiploma: false,
+    diplomaPercentage: "",
+    diplomaBoard: "",
+    diplomaCollege: "",
+    diplomaBranch: "",
+    diplomaPassingYear: "",
     activeBacklogs: "0",
     subjects: [
       { id: "sub-1", name: "Data Structures & Algorithms", gradeOrScore: "A+", proficiency: "Mastered" },

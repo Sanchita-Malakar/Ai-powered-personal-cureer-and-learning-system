@@ -327,6 +327,86 @@ export const AcademicEditModal: React.FC<AcademicEditModalProps> = ({
             </div>
           </div>
 
+          {/* Polytechnic / Diploma in Engineering (Optional / Lateral Entry) */}
+          <div className="space-y-3 pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 block">
+                Polytechnic / Diploma in Engineering (Optional / Lateral Entry)
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                Optional
+              </span>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-canvas/60 border border-border/60 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-ink-muted block mb-1">
+                    Aggregate Percentage / CGPA
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.diplomaPercentage || ""}
+                    onChange={(e) => handleFieldChange("diplomaPercentage", e.target.value)}
+                    placeholder="e.g. 88.4% or 8.9 CGPA"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border text-xs text-ink"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-ink-muted block mb-1">
+                    Board / Council of Technical Education
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.diplomaBoard || ""}
+                    onChange={(e) => handleFieldChange("diplomaBoard", e.target.value)}
+                    placeholder="e.g. WBSCTE / MSBTE / BTEUP / State Board"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border text-xs text-ink"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-bold text-ink-muted block mb-1">
+                    Polytechnic / Institute Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.diplomaCollege || ""}
+                    onChange={(e) => handleFieldChange("diplomaCollege", e.target.value)}
+                    placeholder="e.g. Acharya Prafulla Chandra Polytechnic"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border text-xs text-ink"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-ink-muted block mb-1">
+                    Passing Year
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.diplomaPassingYear || ""}
+                    onChange={(e) => handleFieldChange("diplomaPassingYear", e.target.value)}
+                    placeholder="e.g. 2022"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border text-xs text-ink"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-ink-muted block mb-1">
+                  Diploma Branch / Discipline
+                </label>
+                <input
+                  type="text"
+                  value={formData.diplomaBranch || ""}
+                  onChange={(e) => handleFieldChange("diplomaBranch", e.target.value)}
+                  placeholder="e.g. Diploma in Computer Science & Technology"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-surface border border-border text-xs text-ink"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Core Coursework Subjects */}
           <div className="space-y-3 pt-3 border-t border-border/60">
             <div className="flex items-center justify-between">
