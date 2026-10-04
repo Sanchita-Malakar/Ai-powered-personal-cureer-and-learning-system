@@ -28,6 +28,52 @@ export interface SubjectPerformance {
   name: string;
   gradeOrScore: string; // e.g. "A+", "92%", "9.0"
   proficiency: "Proficient" | "Mastered" | "Learning";
+  credits?: number;
+}
+
+export type ScorecardDocumentType = "secondary" | "higher_secondary" | "semester";
+
+export interface ExtractedScorecardData {
+  documentType: ScorecardDocumentType;
+  institutionName?: string;
+  boardOrUniversity?: string;
+  degreeOrStream?: string;
+  branch?: string;
+  passingYear?: string;
+  rollNumber?: string;
+  percentage?: string;
+  cgpa?: string;
+  sgpa?: string;
+  gradingScale?: string;
+  activeBacklogs?: "0" | "1" | "2+";
+  semesterNumber?: number;
+  subjects?: SubjectPerformance[];
+  confidenceScore?: number;
+  verificationBadge?: string;
+  notes?: string;
+}
+
+export interface UploadedScorecardDoc {
+  id: string;
+  type: ScorecardDocumentType;
+  title: string;
+  fileName: string;
+  fileSize?: string;
+  uploadedAt: string;
+  semesterNumber?: number;
+  extractedData?: ExtractedScorecardData;
+  isVerified?: boolean;
+  fileUrl?: string;
+}
+
+export interface SemesterRecord {
+  id: string;
+  semesterNumber: number;
+  sgpa: string;
+  cgpa?: string;
+  academicYear?: string;
+  subjectsCount?: number;
+  documentId?: string;
 }
 
 export interface AcademicProfile {
@@ -36,9 +82,23 @@ export interface AcademicProfile {
   cgpa: string; // e.g. "8.8"
   gradingScale: "10.0" | "4.0" | "Percentage";
   tenthPercentage: string;
+  tenthBoard?: string;
+  tenthSchool?: string;
+  tenthPassingYear?: string;
   twelfthPercentage: string;
+  twelfthBoard?: string;
+  twelfthSchool?: string;
+  twelfthStream?: string;
+  twelfthPassingYear?: string;
+  degreeName?: string;
+  collegeName?: string;
+  graduationYear?: string;
   activeBacklogs: "0" | "1" | "2+";
   subjects: SubjectPerformance[];
+  uploadedScorecards?: UploadedScorecardDoc[];
+  semesterRecords?: SemesterRecord[];
+  isVerifiedFromDocuments?: boolean;
+  lastDocumentVerifiedAt?: string;
 }
 
 export interface CareerPreferences {

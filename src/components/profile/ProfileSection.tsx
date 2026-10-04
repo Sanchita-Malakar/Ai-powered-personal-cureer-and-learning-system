@@ -317,6 +317,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
             academicProfile={profile.academicProfile}
             degreeName={profile.personalInfo.degree}
             collegeName={profile.personalInfo.college}
+            onUpdateAcademicProfile={updateAcademicProfile}
+            onUpdatePersonalInfo={updatePersonalInfo}
             onEdit={() => handleOpenEdit("academic")}
           />
         )}
