@@ -24,15 +24,16 @@ const TECH_SIGNATURES: TechSignature[] = [
   {
     name: "JavaScript",
     category: "Language",
-    filePatterns: [/\.jsx?$/i],
+    filePatterns: [/\.jsx?$/i, /\.mjs$/i, /\.cjs$/i],
     weight: 0.9,
   },
   {
     name: "Python",
     category: "Language",
-    filePatterns: [/\.py$/i],
-    manifestKeywords: ["python"],
-    importKeywords: [/(?:import\s+\w+|from\s+\w+\s+import)/],
+    filePatterns: [/\.py$/i, /\.pyw$/i, /\.ipynb$/i],
+    configFiles: ["requirements.txt", "Pipfile", "pyproject.toml", "setup.py", "setup.cfg", "environment.yml", "environment.yaml"],
+    manifestKeywords: ["python", "django", "flask", "fastapi", "numpy", "pandas", "scipy", "pytest", "requests", "pydantic", "sqlalchemy", "torch", "tensorflow"],
+    importKeywords: [/(?:import\s+\w+|from\s+\w+\s+import)/, /def\s+\w+\s*\(/, /class\s+\w+.*:/],
     weight: 1.0,
   },
   {
@@ -71,7 +72,7 @@ const TECH_SIGNATURES: TechSignature[] = [
     weight: 0.8,
   },
 
-  // Frameworks - Web / Fullstack
+  // Frameworks - Web / Fullstack & Python
   {
     name: "React",
     category: "Framework",
@@ -114,7 +115,7 @@ const TECH_SIGNATURES: TechSignature[] = [
   {
     name: "FastAPI",
     category: "Framework",
-    manifestKeywords: ["fastapi"],
+    manifestKeywords: ["fastapi", "uvicorn"],
     importKeywords: [/from\s+fastapi\s+import/, /import\s+fastapi/],
     weight: 1.1,
   },
@@ -130,8 +131,15 @@ const TECH_SIGNATURES: TechSignature[] = [
     name: "Flask",
     category: "Framework",
     manifestKeywords: ["flask"],
-    importKeywords: [/from\s+flask\s+import/],
+    importKeywords: [/from\s+flask\s+import/, /import\s+flask/],
     weight: 0.9,
+  },
+  {
+    name: "Streamlit",
+    category: "Framework",
+    manifestKeywords: ["streamlit"],
+    importKeywords: [/import\s+streamlit/, /from\s+streamlit/],
+    weight: 1.0,
   },
   {
     name: "Spring Boot",
@@ -164,6 +172,13 @@ const TECH_SIGNATURES: TechSignature[] = [
     weight: 0.9,
   },
   {
+    name: "SQLAlchemy",
+    category: "Database",
+    manifestKeywords: ["sqlalchemy"],
+    importKeywords: [/import\s+sqlalchemy/, /from\s+sqlalchemy/],
+    weight: 1.0,
+  },
+  {
     name: "Prisma",
     category: "Database",
     manifestKeywords: ["@prisma/client", "prisma"],
@@ -179,7 +194,21 @@ const TECH_SIGNATURES: TechSignature[] = [
     weight: 0.9,
   },
 
-  // AI & ML
+  // AI & Data Science
+  {
+    name: "Pandas",
+    category: "Library",
+    manifestKeywords: ["pandas"],
+    importKeywords: [/import\s+pandas/, /from\s+pandas/],
+    weight: 1.0,
+  },
+  {
+    name: "NumPy",
+    category: "Library",
+    manifestKeywords: ["numpy"],
+    importKeywords: [/import\s+numpy/, /from\s+numpy/],
+    weight: 1.0,
+  },
   {
     name: "LangChain",
     category: "Library",
@@ -197,8 +226,8 @@ const TECH_SIGNATURES: TechSignature[] = [
   {
     name: "TensorFlow",
     category: "Library",
-    manifestKeywords: ["tensorflow"],
-    importKeywords: [/import\s+tensorflow\b/],
+    manifestKeywords: ["tensorflow", "keras"],
+    importKeywords: [/import\s+tensorflow\b/, /import\s+keras\b/],
     weight: 1.2,
   },
   {
@@ -333,10 +362,15 @@ export function performStaticAnalysis(snapshot: GithubRepoSnapshot): StaticAnaly
     }
 
     // Also check GitHub API languages breakdown for language categories
-    if (sig.category === "Language" && snapshot.languages[sig.name]) {
-      const bytes = snapshot.languages[sig.name];
-      matchCount += 3;
-      signals.push(`GitHub language statistics: ${(bytes / 1024).toFixed(1)} KB`);
+    if (sig.category === "Language" && snapshot.languages) {
+      const langMatch = Object.entries(snapshot.languages).find(
+        ([k]) => k.toLowerCase() === sig.name.toLowerCase()
+      );
+      if (langMatch) {
+        const bytes = langMatch[1];
+        matchCount += 4;
+        signals.push(`GitHub language statistics: ${(bytes / 1024).toFixed(1)} KB verified`);
+      }
     }
 
     if (matchCount >= 2) {

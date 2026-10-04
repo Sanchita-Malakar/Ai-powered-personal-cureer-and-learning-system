@@ -165,7 +165,12 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
       const report: ProjectVerificationReport = data.report;
       const effectiveId = data.effectiveProjectId || report.projectId || project.id;
 
-      // Update project state with verified score and timestamp
+      // Update project state with verified score, technologies, and timestamp
+      const verifiedTechnologies =
+        report.detectedTechnologies && report.detectedTechnologies.length > 0
+          ? report.detectedTechnologies.map((t) => t.name)
+          : project.technologies;
+
       const verifiedList = projects.map((p) =>
         p.id === project.id
           ? {
@@ -176,6 +181,7 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
               lastVerifiedAt: report.verifiedAt,
               verifiedCommitSha: report.commitSha,
               rootPath: report.rootPath || p.rootPath,
+              technologies: verifiedTechnologies,
             }
           : p
       );
@@ -210,7 +216,8 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
   const handleViewReport = async (project: ProjectItem) => {
     // Try retrieving real report from database first
     try {
-      const res = await authenticatedFetch(`/api/projects/${project.id}/verification`);
+      const queryParam = project.githubUrl ? `?githubUrl=${encodeURIComponent(project.githubUrl)}` : "";
+      const res = await authenticatedFetch(`/api/projects/${project.id}/verification${queryParam}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.report) {
@@ -245,20 +252,22 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
       },
       detectedTechnologies: (project.technologies || []).map((t, i) => ({
         name: t,
-        category: i === 0 ? "Framework" : "Language",
+        category: i === 0 ? "Language" : "Framework",
         score: Math.min(95, (project.verificationScore || 75) + (i % 2 === 0 ? 5 : -5)),
         filesCount: 12 + i * 4,
         signals: [`Verified source implementation in repository code`],
       })),
       aiAnalysisSummary: {
-        architecturalPattern: "Modular Full-Stack Application",
+        architecturalPattern: "Modular Architecture",
         codeQualityTier: "Production-ready",
         keyHighlights: [
           `Verified source implementation for ${project.technologies.join(", ")}`,
           `High-cohesion modular architecture and clean configuration files detected`,
         ],
-        engineeringStrengths: ["Clear directory separation", "Structured manifests"],
-        recommendations: ["Maintain unit test suites for edge cases"],
+        engineeringStrengths: ["Clear directory separation", "Structured configuration manifests"],
+        skillGaps: ["Automated unit test coverage", "CI/CD automated regression pipeline"],
+        weakPoints: ["Limited automated unit tests", "Async error-handling edge cases"],
+        recommendations: ["Maintain unit test suites for edge cases", "Add automated typing and lint checks in CI"],
       },
       skillImpacts: (project.technologies || []).slice(0, 3).map((t) => ({
         skillName: t,

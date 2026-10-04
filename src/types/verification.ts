@@ -49,6 +49,8 @@ export interface AiAnalysisSummary {
   keyHighlights: string[];
   engineeringStrengths: string[];
   recommendations: string[];
+  skillGaps?: string[];
+  weakPoints?: string[];
 }
 
 export interface SkillImpact {

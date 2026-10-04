@@ -523,13 +523,16 @@ export async function persistVerificationToDatabase(
       overall_score: report.overallScore,
       metrics: report.metrics,
       detected_technologies: report.detectedTechnologies,
-      ai_analysis_summary: report.aiAnalysisSummary,
+      ai_analysis_summary: {
+        ...report.aiAnalysisSummary,
+        skillImpacts: report.skillImpacts,
+      },
       status: report.status,
       error_message: report.errorMessage || null,
       verified_at: report.verifiedAt,
     });
 
-    // 2. Update Student Project Status
+    // 2. Update Student Project Status and Technologies
     await client
       .from("student_projects")
       .update({
@@ -538,6 +541,8 @@ export async function persistVerificationToDatabase(
         last_verified_at: report.verifiedAt,
         verified_commit_sha: report.commitSha || null,
         root_path: report.rootPath || null,
+        technologies: report.detectedTechnologies.map((t) => t.name),
+        updated_at: new Date().toISOString(),
       })
       .eq("id", report.projectId)
       .eq("user_id", userId);

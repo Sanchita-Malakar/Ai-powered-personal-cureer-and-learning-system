@@ -26,57 +26,79 @@ async function callGeminiEvaluation(
   staticResult: StaticAnalysisResult,
   apiKey: string
 ): Promise<AiAnalysisSummary | null> {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // Try latest Gemini models in order of priority
+  const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-pro"];
 
   const techNames = staticResult.detectedTechnologies.map((t) => t.name).join(", ");
   const metrics = staticResult.metrics;
 
-  const prompt = `You are a Senior Engineering Lead evaluating a student's GitHub repository for evidence-based skill verification.
+  const prompt = `You are a Senior Staff Engineer evaluating a student's GitHub repository for evidence-based technical assessment.
 CRITICAL CONSTRAINT: Do NOT hallucinate technologies. Only evaluate what is grounded in observable code evidence.
 
 Repository Context:
-- Repository: ${snapshot.fullName}
+- Full Name: ${snapshot.fullName}
 - Description: ${snapshot.description || "N/A"}
 - Total Source Files: ${snapshot.totalCodeFiles}
 - Detected Technologies (from AST & manifests): ${techNames || "General Codebase"}
-- Code Metrics: TechDepth=${metrics.technologyDepth}/100, ArchQuality=${metrics.architectureQuality}/100, Testing=${metrics.testingPractices}/100, Engineering=${metrics.engineeringPractices}/100
+- Code Metrics: TechDepth=${metrics.technologyDepth}/100, ArchQuality=${metrics.architectureQuality}/100, Testing=${metrics.testingPractices}/100, Engineering=${metrics.engineeringPractices}/100, Documentation=${metrics.documentationPractices}/100
 - Docker Present: ${staticResult.dockerPresent}
 - CI/CD Present: ${staticResult.ciPresent}
-- Test Files: ${staticResult.testFileCount}
+- Test Files Count: ${staticResult.testFileCount}
+- Key Manifests / Dependencies:
+${snapshot.manifests.slice(0, 4).map((m) => `--- ${m.path} ---\n${m.content.slice(0, 1000)}`).join("\n\n")}
+- Representative Code Snippets:
+${snapshot.sourceFileSnippets.slice(0, 4).map((s) => `--- ${s.path} ---\n${s.content.slice(0, 800)}`).join("\n\n")}
 
-Return a valid JSON object matching this schema exactly without markdown formatting:
+CRITICAL INSTRUCTIONS:
+1. Provide accurate architectural classification.
+2. Identify observable Skill Gaps in this codebase (e.g. missing unit tests, absence of type hints, lack of input validation, unconfigured environment handling).
+3. Identify technical Weak Points (e.g. monolithic files, hardcoded credentials, lack of async/concurrency, missing error recovery).
+4. Provide concrete, actionable recommendations for the student to bridge these gaps.
+
+Return ONLY a valid JSON object matching this schema exactly without markdown fences:
 {
-  "architecturalPattern": "string (e.g. Modern Full-Stack App Router Architecture / Layered REST Microservice)",
+  "architecturalPattern": "string (e.g. Python Modular Microservice / FastAPI Clean Architecture / Next.js Full-Stack App)",
   "codeQualityTier": "Production-ready" | "Substantial Prototype" | "Learning / Tutorial" | "Minimal / Incomplete",
   "keyHighlights": ["bullet 1", "bullet 2", "bullet 3"],
-  "engineeringStrengths": ["bullet 1", "bullet 2"],
-  "recommendations": ["bullet 1", "bullet 2"]
+  "engineeringStrengths": ["strength 1", "strength 2"],
+  "skillGaps": ["skill gap 1", "skill gap 2"],
+  "weakPoints": ["weak point 1", "weak point 2"],
+  "recommendations": ["recommendation 1", "recommendation 2"]
 }`;
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      },
-    }),
-  });
+  for (const model of candidateModels) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+          },
+        }),
+      });
 
-  if (!res.ok) return null;
+      if (!res.ok) {
+        continue;
+      }
 
-  const data = await res.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) return null;
+      const data = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) continue;
 
-  try {
-    const parsed: AiAnalysisSummary = JSON.parse(rawText);
-    return parsed;
-  } catch {
-    return null;
+      const parsed: AiAnalysisSummary = JSON.parse(rawText);
+      if (parsed.architecturalPattern && parsed.codeQualityTier) {
+        return parsed;
+      }
+    } catch {
+      // Try next model
+    }
   }
+
+  return null;
 }
 
 function generateDeterministicSummary(
@@ -90,8 +112,8 @@ function generateDeterministicSummary(
   let architecturalPattern = "Modular Application Architecture";
   if (techNames.includes("Next.js")) {
     architecturalPattern = "Modern Next.js Full-Stack App Architecture";
-  } else if (techNames.includes("FastAPI") || techNames.includes("Flask") || techNames.includes("Django")) {
-    architecturalPattern = "Python RESTful Backend & Microservice Architecture";
+  } else if (techNames.includes("FastAPI") || techNames.includes("Flask") || techNames.includes("Django") || techNames.includes("Python")) {
+    architecturalPattern = "Python Modular Backend & Service Architecture";
   } else if (techNames.includes("Express") || techNames.includes("NestJS") || techNames.includes("Node.js")) {
     architecturalPattern = "Node.js Event-Driven Backend API Architecture";
   } else if (techNames.includes("React")) {
@@ -134,13 +156,37 @@ function generateDeterministicSummary(
     engineeringStrengths.push("Clean project configuration and structured dependency declarations.");
   }
 
+  // Skill Gaps
+  const skillGaps: string[] = [];
+  if (testFileCount === 0) {
+    skillGaps.push("Automated Testing: No unit or integration test suites (e.g. pytest, unittest) found.");
+  }
+  if (!ciPresent) {
+    skillGaps.push("Continuous Integration: Absence of GitHub Actions CI pipeline for automated testing.");
+  }
+  if (!dockerPresent) {
+    skillGaps.push("Containerization: Missing Dockerfile / docker-compose for deterministic execution environments.");
+  }
+
+  // Weak Points
+  const weakPoints: string[] = [];
+  if (testFileCount === 0) {
+    weakPoints.push("Code regression risk due to absence of automated test coverage.");
+  }
+  if (metrics.documentationPractices < 60) {
+    weakPoints.push("Documentation could be expanded with API usage examples and installation prerequisites.");
+  }
+  if (weakPoints.length === 0) {
+    weakPoints.push("Opportunity to enhance integration test coverage for boundary error conditions.");
+  }
+
   // Recommendations
   const recommendations: string[] = [];
   if (testFileCount === 0) {
-    recommendations.push("Introduce automated test suites (unit & integration tests) to elevate verification confidence.");
+    recommendations.push("Introduce automated test suites (e.g. pytest for Python) to elevate verification confidence.");
   }
   if (!ciPresent) {
-    recommendations.push("Add a GitHub Actions CI pipeline to run linter and automated build checks.");
+    recommendations.push("Add a GitHub Actions CI pipeline to run linters and automated tests on push.");
   }
   if (recommendations.length === 0) {
     recommendations.push("Expand integration test coverage and document API endpoint payloads in README.");
@@ -151,6 +197,9 @@ function generateDeterministicSummary(
     codeQualityTier,
     keyHighlights,
     engineeringStrengths,
+    skillGaps,
+    weakPoints,
     recommendations,
   };
 }
+
