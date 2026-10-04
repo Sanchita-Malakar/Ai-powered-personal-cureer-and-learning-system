@@ -15,6 +15,7 @@ import {
   persistVerificationToDatabase,
   validateStudentProjectOwnership,
   validateStudentRepoAccess,
+  ensureStudentProject,
 } from "@/lib/supabaseServer";
 
 export async function POST(
@@ -39,27 +40,58 @@ export async function POST(
     }
 
     const userId = authenticatedStudent ? authenticatedStudent.id : "demo-student";
+    const userToken = authenticatedStudent?.token;
 
-    // 2. Validate Project Ownership (Prevent Student A from verifying Student B's project)
+    // 2. Validate Project Ownership or Auto-Provision Student Project
     let dbProject: any = null;
+    let effectiveProjectId = projectId;
+
     if (authenticatedStudent) {
-      const ownership = await validateStudentProjectOwnership(authenticatedStudent.id, projectId);
-      if (!ownership.isValid) {
-        return NextResponse.json(
+      const ownership = await validateStudentProjectOwnership(
+        authenticatedStudent.id,
+        projectId,
+        userToken
+      );
+
+      if (ownership.isValid && ownership.project) {
+        dbProject = ownership.project;
+        effectiveProjectId = dbProject.id;
+      } else {
+        // Project ID was not found by UUID in database (e.g. client local ID 'proj-1' or not yet persisted).
+        // Auto-provision a verified record for this authenticated student
+        const reqGithubUrl = body.githubUrl;
+        if (!reqGithubUrl) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Project not found and no GitHub repository URL was provided.",
+            },
+            { status: 400 }
+          );
+        }
+
+        const provisioned = await ensureStudentProject(
+          authenticatedStudent.id,
+          projectId,
           {
-            success: false,
-            error: ownership.error || "Unauthorized: You do not own this project.",
+            title: body.projectTitle || "Featured Project",
+            githubUrl: reqGithubUrl,
+            rootPath: body.rootPath,
+            githubRepositoryId: body.githubRepositoryId ? Number(body.githubRepositoryId) : undefined,
           },
-          { status: 403 }
+          userToken
         );
+
+        dbProject = provisioned.project;
+        effectiveProjectId = provisioned.id;
       }
-      dbProject = ownership.project;
 
       // If project is linked to a specific GitHub repository ID, validate tenant access
       if (dbProject?.github_repository_id) {
         const repoAccess = await validateStudentRepoAccess(
           authenticatedStudent.id,
-          Number(dbProject.github_repository_id)
+          Number(dbProject.github_repository_id),
+          userToken
         );
         if (!repoAccess.hasAccess) {
           return NextResponse.json(
@@ -106,7 +138,7 @@ export async function POST(
     // 5. Resolve Student's GitHub App Installation (Strict Multi-Tenant Isolation)
     let installationId: number | undefined;
     if (authenticatedStudent) {
-      const connection = await getStudentGithubConnection(authenticatedStudent.id);
+      const connection = await getStudentGithubConnection(authenticatedStudent.id, userToken);
       if (connection && connection.connectionStatus === "connected") {
         installationId = connection.installationId;
       }
@@ -156,7 +188,7 @@ export async function POST(
     // 11. Assemble Full Verification Report
     const report: ProjectVerificationReport = {
       id: `verif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      projectId,
+      projectId: effectiveProjectId,
       userId,
       repoOwner: snapshot.owner,
       repoName: snapshot.repo,
@@ -174,11 +206,12 @@ export async function POST(
 
     // 12. Persist to Database if user is authenticated
     if (authenticatedStudent) {
-      await persistVerificationToDatabase(report, authenticatedStudent.id, projectTitle);
+      await persistVerificationToDatabase(report, authenticatedStudent.id, projectTitle, userToken);
     }
 
     return NextResponse.json({
       success: true,
+      effectiveProjectId,
       report,
       skillImpacts,
       authMode: snapshot.authMode,
@@ -194,3 +227,4 @@ export async function POST(
     );
   }
 }
+

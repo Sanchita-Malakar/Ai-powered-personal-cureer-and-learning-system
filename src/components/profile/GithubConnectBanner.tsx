@@ -28,6 +28,7 @@ export const GithubConnectBanner: React.FC<GithubConnectBannerProps> = ({
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [status, setStatus] = useState<{
     isConnected: boolean;
     username: string | null;
@@ -59,6 +60,9 @@ export const GithubConnectBanner: React.FC<GithubConnectBannerProps> = ({
             isAppConfigured: data.isAppConfigured,
             hasDevTokenFallback: data.hasDevTokenFallback,
           });
+          if (data.isConnected && onConnectionChange) {
+            onConnectionChange();
+          }
         }
       }
     } catch (e) {
@@ -68,8 +72,20 @@ export const GithubConnectBanner: React.FC<GithubConnectBannerProps> = ({
     }
   };
 
+  const handleManualSync = async () => {
+    setSyncing(true);
+    await fetchStatus();
+    setSyncing(false);
+  };
+
   useEffect(() => {
     fetchStatus();
+
+    // Auto re-check when browser tab regains focus (e.g. student saved settings on GitHub)
+    const onFocus = () => {
+      fetchStatus();
+    };
+    window.addEventListener("focus", onFocus);
 
     // Check for callback query params in URL
     if (typeof window !== "undefined") {
@@ -82,6 +98,10 @@ export const GithubConnectBanner: React.FC<GithubConnectBannerProps> = ({
         window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       }
     }
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+    };
   }, [userId]);
 
   const handleConnect = async () => {
@@ -165,6 +185,17 @@ export const GithubConnectBanner: React.FC<GithubConnectBannerProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={syncing}
+              className="px-2.5 py-1.5 rounded-xl bg-surface border border-border/70 text-xs text-ink-muted hover:text-accent transition-colors flex items-center gap-1 cursor-pointer"
+              title="Re-sync repositories from GitHub"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
+
             {onOpenRepoSelector && (
               <button
                 type="button"
@@ -203,24 +234,37 @@ export const GithubConnectBanner: React.FC<GithubConnectBannerProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleConnect}
-            disabled={connecting}
-            className="px-4 py-2 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all flex items-center gap-2 shadow-sm shadow-accent/25 shrink-0 cursor-pointer disabled:opacity-50"
-          >
-            {connecting ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Redirecting to GitHub...</span>
-              </>
-            ) : (
-              <>
-                <Github className="w-3.5 h-3.5" />
-                <span>Connect GitHub</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleManualSync}
+              disabled={syncing || connecting}
+              className="px-3 py-2 rounded-xl bg-surface border border-border/80 text-xs font-semibold text-ink hover:text-accent transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              title="Check GitHub for authorized repositories"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-accent ${syncing ? "animate-spin" : ""}`} />
+              <span>{syncing ? "Checking..." : "Sync Status"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleConnect}
+              disabled={connecting || syncing}
+              className="px-4 py-2 rounded-xl bg-accent text-white font-bold hover:bg-accent/90 transition-all flex items-center gap-2 shadow-sm shadow-accent/25 shrink-0 cursor-pointer disabled:opacity-50"
+            >
+              {connecting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Redirecting to GitHub...</span>
+                </>
+              ) : (
+                <>
+                  <Github className="w-3.5 h-3.5" />
+                  <span>Connect GitHub</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </div>

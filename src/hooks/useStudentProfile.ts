@@ -341,27 +341,53 @@ export function useStudentProfile() {
 
           // Sync projects to student_projects
           if (finalProfile.projects && finalProfile.projects.length > 0) {
+            const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
             for (const proj of finalProfile.projects) {
-              await supabase.from("student_projects").upsert(
-                {
-                  id: proj.id.startsWith("proj-") && proj.id.length > 20 ? undefined : proj.id,
-                  user_id: user.id,
-                  title: proj.title,
-                  role: proj.role,
-                  description: proj.description,
-                  technologies: proj.technologies || [],
-                  github_url: proj.githubUrl || "https://github.com",
-                  live_url: proj.liveUrl || null,
-                  impact_metrics: proj.impactMetrics || null,
-                  verification_status: proj.verificationStatus || "NOT_VERIFIED",
-                  verification_score: proj.verificationScore || null,
-                  last_verified_at: proj.lastVerifiedAt || null,
-                  root_path: proj.rootPath || null,
-                  github_repository_id: proj.githubRepositoryId ? Number(proj.githubRepositoryId) : null,
-                  verified_commit_sha: proj.verifiedCommitSha || null,
-                },
-                { onConflict: "id" }
-              );
+              const projectPayload: any = {
+                user_id: user.id,
+                title: proj.title || "Featured Project",
+                role: proj.role || "Developer",
+                description: proj.description || "",
+                technologies: proj.technologies || [],
+                github_url: proj.githubUrl || "https://github.com",
+                live_url: proj.liveUrl || null,
+                impact_metrics: proj.impactMetrics || null,
+                verification_status: proj.verificationStatus || "NOT_VERIFIED",
+                verification_score: proj.verificationScore || null,
+                last_verified_at: proj.lastVerifiedAt || null,
+                root_path: proj.rootPath || null,
+                github_repository_id: proj.githubRepositoryId ? Number(proj.githubRepositoryId) : null,
+                verified_commit_sha: proj.verifiedCommitSha || null,
+                updated_at: new Date().toISOString(),
+              };
+
+              if (UUID_REGEX.test(proj.id)) {
+                projectPayload.id = proj.id;
+                await supabase.from("student_projects").upsert(projectPayload, { onConflict: "id" });
+              } else {
+                // If it's a client ID (e.g. proj-1), look up by user and github_url or insert
+                const { data: existing } = await supabase
+                  .from("student_projects")
+                  .select("id")
+                  .eq("user_id", user.id)
+                  .eq("github_url", projectPayload.github_url)
+                  .maybeSingle();
+
+                if (existing?.id) {
+                  projectPayload.id = existing.id;
+                  await supabase.from("student_projects").upsert(projectPayload, { onConflict: "id" });
+                  proj.id = existing.id;
+                } else {
+                  const { data: inserted } = await supabase
+                    .from("student_projects")
+                    .insert(projectPayload)
+                    .select("id")
+                    .maybeSingle();
+                  if (inserted?.id) {
+                    proj.id = inserted.id;
+                  }
+                }
+              }
             }
           }
 

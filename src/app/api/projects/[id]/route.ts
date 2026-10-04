@@ -21,9 +21,10 @@ export async function PATCH(
     }
 
     const projectId = params.id;
+    const userToken = student.token;
 
     // Validate student ownership
-    const ownership = await validateStudentProjectOwnership(student.id, projectId);
+    const ownership = await validateStudentProjectOwnership(student.id, projectId, userToken);
     if (!ownership.isValid) {
       return NextResponse.json(
         { success: false, error: ownership.error || "Unauthorized project modification." },
@@ -32,7 +33,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const client = getSupabaseServerClient();
+    const client = getSupabaseServerClient(userToken);
 
     if (!client) {
       return NextResponse.json({ success: true, updated: body });
@@ -48,7 +49,7 @@ export async function PATCH(
 
     // Validate repo access if changing repo
     if (body.githubRepositoryId) {
-      const repoAccess = await validateStudentRepoAccess(student.id, Number(body.githubRepositoryId));
+      const repoAccess = await validateStudentRepoAccess(student.id, Number(body.githubRepositoryId), userToken);
       if (!repoAccess.hasAccess) {
         return NextResponse.json(
           { success: false, error: repoAccess.error || "Unauthorized repository access." },
@@ -91,7 +92,8 @@ export async function PATCH(
         student.id,
         projectId,
         Number(body.githubRepositoryId),
-        body.rootPath ? body.rootPath.trim() : undefined
+        body.rootPath ? body.rootPath.trim() : undefined,
+        userToken
       );
     }
 
@@ -118,9 +120,10 @@ export async function DELETE(
     }
 
     const projectId = params.id;
+    const userToken = student.token;
 
     // Validate ownership before deleting
-    const ownership = await validateStudentProjectOwnership(student.id, projectId);
+    const ownership = await validateStudentProjectOwnership(student.id, projectId, userToken);
     if (!ownership.isValid) {
       return NextResponse.json(
         { success: false, error: ownership.error || "Unauthorized project deletion." },
@@ -128,7 +131,7 @@ export async function DELETE(
       );
     }
 
-    const client = getSupabaseServerClient();
+    const client = getSupabaseServerClient(userToken);
     if (!client) {
       return NextResponse.json({ success: true });
     }

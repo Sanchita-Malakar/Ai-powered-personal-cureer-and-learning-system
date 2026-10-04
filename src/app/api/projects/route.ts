@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const client = getSupabaseServerClient();
+    const client = getSupabaseServerClient(student.token);
     if (!client) {
       return NextResponse.json({ success: true, projects: [] });
     }
@@ -83,9 +83,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const userToken = student.token;
+
     // If a specific GitHub repository ID was selected, ensure it belongs to this student
     if (githubRepositoryId) {
-      const repoAccess = await validateStudentRepoAccess(student.id, Number(githubRepositoryId));
+      const repoAccess = await validateStudentRepoAccess(student.id, Number(githubRepositoryId), userToken);
       if (!repoAccess.hasAccess) {
         return NextResponse.json(
           { success: false, error: repoAccess.error || "Repository access not authorized." },
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const client = getSupabaseServerClient();
+    const client = getSupabaseServerClient(userToken);
     if (!client) {
       return NextResponse.json({
         success: true,
@@ -143,7 +145,8 @@ export async function POST(request: NextRequest) {
         student.id,
         data.id,
         Number(githubRepositoryId),
-        rootPath?.trim() || undefined
+        rootPath?.trim() || undefined,
+        userToken
       );
     }
 

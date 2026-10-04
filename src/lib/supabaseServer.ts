@@ -13,17 +13,31 @@ const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "";
 
-export function getSupabaseServerClient(): SupabaseClient | null {
+export interface AuthenticatedStudent {
+  id: string;
+  email?: string;
+  token?: string;
+}
+
+export function getSupabaseServerClient(token?: string): SupabaseClient | null {
   if (!supabaseUrl || !supabaseKey || !supabaseUrl.startsWith("http")) {
     return null;
   }
   try {
-    return createClient(supabaseUrl, supabaseKey, {
+    const options: any = {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
-    });
+    };
+    if (token) {
+      options.global = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+    }
+    return createClient(supabaseUrl, supabaseKey, options);
   } catch (err) {
     console.warn("Failed to create Supabase server client:", err);
     return null;
@@ -36,7 +50,7 @@ export function getSupabaseServerClient(): SupabaseClient | null {
  */
 export async function getAuthenticatedStudent(
   request: NextRequest
-): Promise<{ id: string; email?: string } | null> {
+): Promise<AuthenticatedStudent | null> {
   const client = getSupabaseServerClient();
   if (!client) {
     return null;
@@ -50,7 +64,7 @@ export async function getAuthenticatedStudent(
       try {
         const { data, error } = await client.auth.getUser(token);
         if (!error && data?.user) {
-          return { id: data.user.id, email: data.user.email };
+          return { id: data.user.id, email: data.user.email, token };
         }
       } catch {
         // Fall through
@@ -91,7 +105,7 @@ export async function getAuthenticatedStudent(
         try {
           const { data, error } = await client.auth.getUser(tokenToVerify);
           if (!error && data?.user) {
-            return { id: data.user.id, email: data.user.email };
+            return { id: data.user.id, email: data.user.email, token: tokenToVerify };
           }
         } catch {
           // Try next cookie
@@ -103,16 +117,28 @@ export async function getAuthenticatedStudent(
   return null;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Validates that a project strictly belongs to the authenticated student.
  */
 export async function validateStudentProjectOwnership(
   studentId: string,
-  projectId: string
+  projectId: string,
+  token?: string
 ): Promise<{ isValid: boolean; project?: any; error?: string }> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) {
     return { isValid: true };
+  }
+
+  // If projectId is not a valid UUID (e.g. client local ID 'proj-1' or newly added item),
+  // return not found gracefully instead of throwing PostgreSQL syntax error
+  if (!UUID_REGEX.test(projectId)) {
+    return {
+      isValid: false,
+      error: "Project not yet persisted to database.",
+    };
   }
 
   const { data, error } = await client
@@ -133,13 +159,112 @@ export async function validateStudentProjectOwnership(
 }
 
 /**
+ * Ensures a project exists in student_projects for the student.
+ * If the project already exists by ID (UUID) or by (user_id, github_url), returns it.
+ * If not, inserts a new record with a valid generated UUID.
+ */
+export async function ensureStudentProject(
+  studentId: string,
+  projectId: string,
+  data: {
+    title: string;
+    githubUrl: string;
+    rootPath?: string;
+    githubRepositoryId?: number;
+    description?: string;
+    technologies?: string[];
+  },
+  token?: string
+): Promise<{ id: string; project: any }> {
+  const client = getSupabaseServerClient(token);
+  if (!client) {
+    return { id: projectId, project: { id: projectId, ...data, user_id: studentId } };
+  }
+
+  // 1. Try to find by UUID if projectId is a valid UUID
+  if (UUID_REGEX.test(projectId)) {
+    const { data: existingById } = await client
+      .from("student_projects")
+      .select("*")
+      .eq("id", projectId)
+      .eq("user_id", studentId)
+      .maybeSingle();
+
+    if (existingById) {
+      if (
+        data.githubUrl &&
+        (existingById.github_url !== data.githubUrl ||
+          (data.rootPath && existingById.root_path !== data.rootPath))
+      ) {
+        await client
+          .from("student_projects")
+          .update({
+            github_url: data.githubUrl,
+            root_path: data.rootPath || existingById.root_path,
+            github_repository_id: data.githubRepositoryId || existingById.github_repository_id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingById.id);
+      }
+      return { id: existingById.id, project: existingById };
+    }
+  }
+
+  // 2. Try to find existing project by (user_id, github_url)
+  if (data.githubUrl) {
+    const normalizedUrl = data.githubUrl.toLowerCase().trim().replace(/\/+$/, "");
+    const { data: existingByUrl } = await client
+      .from("student_projects")
+      .select("*")
+      .eq("user_id", studentId)
+      .ilike("github_url", `${normalizedUrl}%`)
+      .maybeSingle();
+
+    if (existingByUrl) {
+      return { id: existingByUrl.id, project: existingByUrl };
+    }
+  }
+
+  // 3. Insert new row in student_projects with auto-generated UUID
+  const newProjectRow: any = {
+    user_id: studentId,
+    title: data.title || "Featured Project",
+    role: "Developer",
+    description:
+      data.description ||
+      "Production repository verified through CareerOS GitHub App integration.",
+    technologies: data.technologies || ["TypeScript", "React"],
+    github_url: data.githubUrl,
+    root_path: data.rootPath || null,
+    github_repository_id: data.githubRepositoryId || null,
+    verification_status: "ANALYZING",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: inserted, error: insertError } = await client
+    .from("student_projects")
+    .insert(newProjectRow)
+    .select("*")
+    .maybeSingle();
+
+  if (insertError || !inserted) {
+    console.warn("Could not insert student project row via server client:", insertError);
+    return { id: projectId, project: newProjectRow };
+  }
+
+  return { id: inserted.id, project: inserted };
+}
+
+/**
  * Validates that a GitHub repository ID is permitted by the student's GitHub installation.
  */
 export async function validateStudentRepoAccess(
   studentId: string,
-  githubRepositoryId: number
+  githubRepositoryId: number,
+  token?: string
 ): Promise<{ hasAccess: boolean; repo?: any; error?: string }> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) {
     return { hasAccess: true };
   }
@@ -165,9 +290,10 @@ export async function validateStudentRepoAccess(
  * Fetches the student's active GitHub App connection.
  */
 export async function getStudentGithubConnection(
-  studentId: string
+  studentId: string,
+  token?: string
 ): Promise<GithubConnection | null> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) return null;
 
   const { data, error } = await client
@@ -195,9 +321,10 @@ export async function getStudentGithubConnection(
  * Fetches the repositories accessible to this student's GitHub installation.
  */
 export async function getStudentGithubRepositories(
-  studentId: string
+  studentId: string,
+  token?: string
 ): Promise<GithubPermittedRepo[]> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) return [];
 
   const { data, error } = await client
@@ -242,9 +369,10 @@ export async function saveStudentGithubInstallation(
     default_branch: string;
     private: boolean;
     html_url: string;
-  }>
+  }>,
+  token?: string
 ): Promise<{ success: boolean; connectionId?: string; error?: string }> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) return { success: true };
 
   try {
@@ -301,8 +429,8 @@ export async function saveStudentGithubInstallation(
 /**
  * Marks an installation as revoked (e.g. via webhook or user disconnect).
  */
-export async function markGithubInstallationRevoked(installationId: number): Promise<void> {
-  const client = getSupabaseServerClient();
+export async function markGithubInstallationRevoked(installationId: number, token?: string): Promise<void> {
+  const client = getSupabaseServerClient(token);
   if (!client) return;
 
   await client
@@ -321,9 +449,10 @@ export async function linkProjectToGithubRepo(
   studentId: string,
   projectId: string,
   githubRepositoryId: number,
-  rootPath?: string
+  rootPath?: string,
+  token?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) return { success: true };
 
   try {
@@ -373,9 +502,10 @@ export async function linkProjectToGithubRepo(
 export async function persistVerificationToDatabase(
   report: ProjectVerificationReport,
   userId: string,
-  projectTitle: string
+  projectTitle: string,
+  token?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const client = getSupabaseServerClient();
+  const client = getSupabaseServerClient(token);
   if (!client) {
     return { success: true };
   }
@@ -461,3 +591,4 @@ export async function persistVerificationToDatabase(
     return { success: false, error: err?.message };
   }
 }
+

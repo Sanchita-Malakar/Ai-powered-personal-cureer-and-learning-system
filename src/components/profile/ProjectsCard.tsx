@@ -163,12 +163,14 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
       }
 
       const report: ProjectVerificationReport = data.report;
+      const effectiveId = data.effectiveProjectId || report.projectId || project.id;
 
       // Update project state with verified score and timestamp
       const verifiedList = projects.map((p) =>
         p.id === project.id
           ? {
               ...p,
+              id: effectiveId,
               verificationStatus: "VERIFIED" as const,
               verificationScore: report.overallScore,
               lastVerifiedAt: report.verifiedAt,

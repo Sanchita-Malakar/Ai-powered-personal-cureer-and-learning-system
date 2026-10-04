@@ -19,9 +19,10 @@ export async function GET(
     }
 
     const projectId = params.id;
+    const userToken = student.token;
 
     // Validate project ownership
-    const ownership = await validateStudentProjectOwnership(student.id, projectId);
+    const ownership = await validateStudentProjectOwnership(student.id, projectId, userToken);
     if (!ownership.isValid) {
       return NextResponse.json(
         { success: false, error: ownership.error || "Unauthorized." },
@@ -29,7 +30,7 @@ export async function GET(
       );
     }
 
-    const client = getSupabaseServerClient();
+    const client = getSupabaseServerClient(userToken);
     if (!client) {
       return NextResponse.json(
         { success: false, error: "Database client unavailable." },

@@ -165,6 +165,30 @@ export async function getInstallationDetails(
   return await res.json();
 }
 
+/**
+ * Lists all active installations for the CareerOS GitHub App.
+ */
+export async function getAllAppInstallations(): Promise<GithubInstallationDetails[]> {
+  if (!isGithubAppConfigured()) return [];
+  try {
+    const appJwt = generateAppJwt();
+    const res = await fetch("https://api.github.com/app/installations?per_page=100", {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+        Authorization: `Bearer ${appJwt}`,
+        "User-Agent": "CareerOS-Skill-Verification-Platform",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn("Failed to list app installations:", e);
+    return [];
+  }
+}
+
 export interface GithubPermittedRepoItem {
   id: number;
   name: string;
