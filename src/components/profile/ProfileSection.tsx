@@ -138,6 +138,20 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
     };
 
     updateSkills(nextSkills);
+
+    if (typeof window !== "undefined") {
+      try {
+        if (report.aiAnalysisSummary?.skillGaps) {
+          localStorage.setItem("careeros_latest_skill_gaps", JSON.stringify(report.aiAnalysisSummary.skillGaps));
+        }
+        if (report.aiAnalysisSummary?.weakPoints) {
+          localStorage.setItem("careeros_latest_weak_points", JSON.stringify(report.aiAnalysisSummary.weakPoints));
+        }
+        window.dispatchEvent(new CustomEvent("project-verified", { detail: report }));
+      } catch (e) {
+        console.warn("Could not dispatch project-verified event:", e);
+      }
+    }
   };
 
   const tabs = [

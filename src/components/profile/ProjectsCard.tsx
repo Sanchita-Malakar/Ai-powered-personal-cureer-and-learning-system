@@ -165,7 +165,7 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
       const report: ProjectVerificationReport = data.report;
       const effectiveId = data.effectiveProjectId || report.projectId || project.id;
 
-      // Update project state with verified score, technologies, and timestamp
+      // Update project state with verified score, technologies, report, and timestamp
       const verifiedTechnologies =
         report.detectedTechnologies && report.detectedTechnologies.length > 0
           ? report.detectedTechnologies.map((t) => t.name)
@@ -182,10 +182,34 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
               verifiedCommitSha: report.commitSha,
               rootPath: report.rootPath || p.rootPath,
               technologies: verifiedTechnologies,
+              verificationReport: report,
             }
           : p
       );
       onUpdateProjects(verifiedList);
+
+      // Persist to localStorage cache for 100% fidelity and immediate offline retrieval
+      if (typeof window !== "undefined") {
+        try {
+          const reportJson = JSON.stringify(report);
+          localStorage.setItem(`careeros_verif_report_${project.id}`, reportJson);
+          if (effectiveId !== project.id) {
+            localStorage.setItem(`careeros_verif_report_${effectiveId}`, reportJson);
+          }
+          if (project.githubUrl) {
+            localStorage.setItem(`careeros_verif_report_${project.githubUrl.toLowerCase()}`, reportJson);
+          }
+          // Also persist latest skill gaps and weak points for downstream modules (Mentor, Roadmap, Learning)
+          if (report.aiAnalysisSummary?.skillGaps) {
+            localStorage.setItem("careeros_latest_skill_gaps", JSON.stringify(report.aiAnalysisSummary.skillGaps));
+          }
+          if (report.aiAnalysisSummary?.weakPoints) {
+            localStorage.setItem("careeros_latest_weak_points", JSON.stringify(report.aiAnalysisSummary.weakPoints));
+          }
+        } catch (storageErr) {
+          console.warn("Could not cache verification report to localStorage:", storageErr);
+        }
+      }
 
       // Close auth modal and open report modal
       setAuthModalProject(null);
@@ -214,13 +238,69 @@ export const ProjectsCard: React.FC<ProjectsCardProps> = ({
   };
 
   const handleViewReport = async (project: ProjectItem) => {
-    // Try retrieving real report from database first
+    // 1. Direct memory check: If project already has its real verified report, open it immediately
+    if (project.verificationReport && project.verificationReport.overallScore) {
+      setReportModalData({
+        report: project.verificationReport,
+        title: project.title,
+        githubUrl: project.githubUrl,
+      });
+      return;
+    }
+
+    // 2. Local storage cache check: Retrieve saved ground-truth report
+    if (typeof window !== "undefined") {
+      try {
+        const cachedRaw =
+          localStorage.getItem(`careeros_verif_report_${project.id}`) ||
+          (project.githubUrl ? localStorage.getItem(`careeros_verif_report_${project.githubUrl.toLowerCase()}`) : null);
+
+        if (cachedRaw) {
+          const cachedReport: ProjectVerificationReport = JSON.parse(cachedRaw);
+          if (cachedReport && cachedReport.overallScore) {
+            // Backfill memory state
+            const updated = projects.map((p) =>
+              p.id === project.id ? { ...p, verificationReport: cachedReport } : p
+            );
+            onUpdateProjects(updated);
+
+            setReportModalData({
+              report: cachedReport,
+              title: project.title,
+              githubUrl: project.githubUrl,
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not read verification report from localStorage:", err);
+      }
+    }
+
+    // 3. Database check: Fetch stored report from server API
     try {
       const queryParam = project.githubUrl ? `?githubUrl=${encodeURIComponent(project.githubUrl)}` : "";
       const res = await authenticatedFetch(`/api/projects/${project.id}/verification${queryParam}`);
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.report) {
+          // Sync with local storage
+          if (typeof window !== "undefined") {
+            try {
+              const repJson = JSON.stringify(data.report);
+              localStorage.setItem(`careeros_verif_report_${project.id}`, repJson);
+              if (project.githubUrl) {
+                localStorage.setItem(`careeros_verif_report_${project.githubUrl.toLowerCase()}`, repJson);
+              }
+            } catch {}
+          }
+
+          // Backfill memory state
+          const updated = projects.map((p) =>
+            p.id === project.id ? { ...p, verificationReport: data.report } : p
+          );
+          onUpdateProjects(updated);
+
           setReportModalData({
             report: data.report,
             title: project.title,

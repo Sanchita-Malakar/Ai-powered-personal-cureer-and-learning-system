@@ -1,5 +1,5 @@
 import { VerifiedCountry, VerifiedCity, VerifiedUniversity } from "./location";
-import { VerificationStatus, ProficiencyLevel } from "./verification";
+import { VerificationStatus, ProficiencyLevel, ProjectVerificationReport } from "./verification";
 
 export interface PersonalInfo {
   fullName: string;
@@ -92,6 +92,7 @@ export interface ProjectItem {
   verifiedCommitSha?: string;
   rootPath?: string; // Monorepo subdirectory e.g. "packages/client"
   githubRepositoryId?: number;
+  verificationReport?: ProjectVerificationReport;
 }
 
 export interface CertificationItem {

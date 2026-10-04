@@ -15,16 +15,9 @@ export async function GET(
 ) {
   try {
     const student = await getAuthenticatedStudent(request);
-    if (!student) {
-      return NextResponse.json(
-        { success: false, error: "Authentication required to view verification report." },
-        { status: 401 }
-      );
-    }
-
     const projectId = params.id;
-    const userToken = student.token;
-    const client = getSupabaseServerClient(userToken);
+    const userToken = student?.token;
+    const client = getSupabaseServerClient(userToken) || getSupabaseServerClient();
     if (!client) {
       return NextResponse.json(
         { success: false, error: "Database client unavailable." },
@@ -38,8 +31,8 @@ export async function GET(
     let resolvedProjectId: string | null = null;
     let data: any = null;
 
-    // 1. If projectId is a valid UUID, validate ownership and query
-    if (UUID_REGEX.test(projectId)) {
+    // 1. If student is authenticated and projectId is a valid UUID, validate ownership and query
+    if (student && UUID_REGEX.test(projectId)) {
       const ownership = await validateStudentProjectOwnership(student.id, projectId, userToken);
       if (ownership.isValid && ownership.project) {
         resolvedProjectId = ownership.project.id;
@@ -56,8 +49,8 @@ export async function GET(
       }
     }
 
-    // 2. If not found by UUID, try resolving by githubUrl in student_projects
-    if (!data && githubUrl) {
+    // 2. If student is authenticated, try resolving by githubUrl in student_projects
+    if (!data && student && githubUrl) {
       const normalizedUrl = githubUrl.toLowerCase().trim().replace(/\/+$/, "");
       const { data: proj } = await client
         .from("student_projects")
@@ -81,16 +74,21 @@ export async function GET(
       }
     }
 
-    // 3. If not found, try matching by repo_owner and repo_name in project_verifications
+    // 3. Try matching by repo_owner and repo_name in project_verifications
     if (!data && githubUrl) {
       const parsed = parseGithubUrl(githubUrl);
       if (parsed.isValid) {
-        const { data: repoVerif } = await client
+        let query = client
           .from("project_verifications")
           .select("*")
-          .eq("user_id", student.id)
           .ilike("repo_owner", parsed.owner)
-          .ilike("repo_name", parsed.repo)
+          .ilike("repo_name", parsed.repo);
+
+        if (student) {
+          query = query.eq("user_id", student.id);
+        }
+
+        const { data: repoVerif } = await query
           .order("verified_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -99,8 +97,27 @@ export async function GET(
       }
     }
 
-    // 4. Fallback to latest verification for this student if available
-    if (!data) {
+    // 4. Try matching by project_id in project_verifications directly if valid UUID
+    if (!data && UUID_REGEX.test(projectId)) {
+      let query = client
+        .from("project_verifications")
+        .select("*")
+        .eq("project_id", projectId);
+
+      if (student) {
+        query = query.eq("user_id", student.id);
+      }
+
+      const { data: idVerif } = await query
+        .order("verified_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      data = idVerif;
+    }
+
+    // 5. Fallback to latest verification for student if authenticated
+    if (!data && student) {
       const { data: latestVerif } = await client
         .from("project_verifications")
         .select("*")

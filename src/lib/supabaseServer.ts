@@ -511,67 +511,114 @@ export async function persistVerificationToDatabase(
   }
 
   try {
-    // 1. Insert Project Verification Report
-    await client.from("project_verifications").insert({
-      id: report.id,
-      project_id: report.projectId,
-      user_id: userId,
-      repo_owner: report.repoOwner,
-      repo_name: report.repoName,
-      commit_sha: report.commitSha || null,
-      analysis_version: report.analysisVersion,
-      overall_score: report.overallScore,
-      metrics: report.metrics,
-      detected_technologies: report.detectedTechnologies,
-      ai_analysis_summary: {
-        ...report.aiAnalysisSummary,
-        skillImpacts: report.skillImpacts,
+    // 1. Ensure targetProjectId is a valid UUID satisfying the student_projects foreign key
+    let targetProjectId = report.projectId;
+    if (!UUID_REGEX.test(targetProjectId)) {
+      const { data: existingProj } = await client
+        .from("student_projects")
+        .select("id")
+        .eq("user_id", userId)
+        .ilike("github_url", `%${report.repoName}%`)
+        .maybeSingle();
+
+      if (existingProj?.id) {
+        targetProjectId = existingProj.id;
+      } else {
+        const { data: newProj, error: newProjErr } = await client
+          .from("student_projects")
+          .insert({
+            user_id: userId,
+            title: projectTitle || report.repoName,
+            role: "Developer",
+            description: "Production repository verified through CareerOS GitHub App integration.",
+            github_url: `https://github.com/${report.repoOwner}/${report.repoName}`,
+            verification_status: "VERIFIED",
+            verification_score: report.overallScore,
+            technologies: report.detectedTechnologies.map((t) => t.name),
+          })
+          .select("id")
+          .single();
+
+        if (newProj?.id) {
+          targetProjectId = newProj.id;
+        } else if (newProjErr) {
+          console.warn("Could not auto-provision project row for foreign key:", newProjErr);
+        }
+      }
+    }
+
+    // 2. Insert or Upsert Project Verification Report
+    const { error: verifErr } = await client.from("project_verifications").upsert(
+      {
+        id: report.id,
+        project_id: targetProjectId,
+        user_id: userId,
+        repo_owner: report.repoOwner,
+        repo_name: report.repoName,
+        commit_sha: report.commitSha || null,
+        analysis_version: report.analysisVersion,
+        overall_score: report.overallScore,
+        metrics: report.metrics,
+        detected_technologies: report.detectedTechnologies,
+        ai_analysis_summary: {
+          ...report.aiAnalysisSummary,
+          skillImpacts: report.skillImpacts,
+        },
+        status: report.status,
+        error_message: report.errorMessage || null,
+        verified_at: report.verifiedAt,
       },
-      status: report.status,
-      error_message: report.errorMessage || null,
-      verified_at: report.verifiedAt,
-    });
+      { onConflict: "id" }
+    );
 
-    // 2. Update Student Project Status and Technologies
-    await client
-      .from("student_projects")
-      .update({
-        verification_status: "VERIFIED",
-        verification_score: report.overallScore,
-        last_verified_at: report.verifiedAt,
-        verified_commit_sha: report.commitSha || null,
-        root_path: report.rootPath || null,
-        technologies: report.detectedTechnologies.map((t) => t.name),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", report.projectId)
-      .eq("user_id", userId);
+    if (verifErr) {
+      console.error("Failed to persist project_verifications row:", verifErr);
+    }
 
-    // 3. Upsert Skill Evidence and History
+    // 3. Update Student Project Status and Technologies
+    if (UUID_REGEX.test(targetProjectId)) {
+      await client
+        .from("student_projects")
+        .update({
+          verification_status: "VERIFIED",
+          verification_score: report.overallScore,
+          last_verified_at: report.verifiedAt,
+          verified_commit_sha: report.commitSha || null,
+          root_path: report.rootPath || null,
+          technologies: report.detectedTechnologies.map((t) => t.name),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", targetProjectId)
+        .eq("user_id", userId);
+    }
+
+    // 4. Upsert Skill Evidence and History
     for (const impact of report.skillImpacts) {
       const detected = report.detectedTechnologies.find(
         (t) => t.name.toLowerCase() === impact.skillName.toLowerCase()
       );
 
-      await client.from("skill_evidence").insert({
-        user_id: userId,
-        skill_name: impact.skillName,
-        project_id: report.projectId,
-        evidence_score: impact.newPercentage,
-        file_count: detected?.filesCount || 1,
-        signals: detected?.signals || [],
-      });
+      if (UUID_REGEX.test(targetProjectId)) {
+        await client.from("skill_evidence").insert({
+          user_id: userId,
+          skill_name: impact.skillName,
+          project_id: targetProjectId,
+          evidence_score: impact.newPercentage,
+          file_count: detected?.filesCount || 1,
+          signals: detected?.signals || [],
+        });
 
-      await client.from("skill_history").insert({
-        user_id: userId,
-        skill_name: impact.skillName,
-        previous_percentage: impact.previousPercentage,
-        new_percentage: impact.newPercentage,
-        previous_level: impact.previousLevel,
-        new_level: impact.newLevel,
-        change_reason: impact.changeReason,
-        project_id: report.projectId,
-      });
+        await client.from("skill_history").insert({
+          user_id: userId,
+          skill_name: impact.skillName,
+          previous_percentage: impact.previousPercentage,
+          new_percentage: impact.newPercentage,
+          previous_level: impact.previousLevel,
+          new_level: impact.newLevel,
+          change_reason: impact.changeReason,
+          project_id: targetProjectId,
+        });
+      }
 
       await client.from("student_skills").upsert(
         {
