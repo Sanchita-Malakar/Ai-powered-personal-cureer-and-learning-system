@@ -700,28 +700,158 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
-                    10th Board %
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.academicProfile.tenthPercentage}
-                    onChange={(e) => handleInputChange("academicProfile", "tenthPercentage", e.target.value)}
-                    placeholder="e.g. 94.2%"
-                    className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
-                  />
+              {/* Class 10 Details */}
+              <div className="p-3 rounded-2xl bg-canvas/60 border border-border/70 space-y-3">
+                <span className="text-xs font-bold text-ink block">Class 10 (Secondary) Credentials</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                      10th Percentage / CGPA
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.academicProfile.tenthPercentage || ""}
+                      onChange={(e) => handleInputChange("academicProfile", "tenthPercentage", e.target.value)}
+                      placeholder="e.g. 94.2%"
+                      className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                      10th Board
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.academicProfile.tenthBoard || ""}
+                      onChange={(e) => handleInputChange("academicProfile", "tenthBoard", e.target.value)}
+                      placeholder="e.g. CBSE / ICSE / State Board"
+                      className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                      10th School Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.academicProfile.tenthSchool || ""}
+                      onChange={(e) => handleInputChange("academicProfile", "tenthSchool", e.target.value)}
+                      placeholder="e.g. St. Xavier's High School"
+                      className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                    />
+                  </div>
                 </div>
+              </div>
+
+              {/* Class 12 Details */}
+              <div className="p-3 rounded-2xl bg-canvas/60 border border-border/70 space-y-3">
+                <span className="text-xs font-bold text-ink block">Class 12 (Higher Secondary) Credentials</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                      12th Percentage
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.academicProfile.twelfthPercentage || ""}
+                      onChange={(e) => handleInputChange("academicProfile", "twelfthPercentage", e.target.value)}
+                      placeholder="e.g. 91.8%"
+                      className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                      12th Board
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.academicProfile.twelfthBoard || ""}
+                      onChange={(e) => handleInputChange("academicProfile", "twelfthBoard", e.target.value)}
+                      placeholder="e.g. CBSE / ISC / State Board"
+                      className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                      12th School Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.academicProfile.twelfthSchool || ""}
+                      onChange={(e) => handleInputChange("academicProfile", "twelfthSchool", e.target.value)}
+                      placeholder="e.g. Delhi Public School"
+                      className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Polytechnic / Diploma (Optional / Lateral Entry) */}
+              <div className="p-3 rounded-2xl bg-canvas/60 border border-border/70 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-ink block">Polytechnic / Diploma (Lateral Entry / Optional)</span>
+                  <label className="inline-flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.academicProfile.hasDiploma)}
+                      onChange={(e) => handleInputChange("academicProfile", "hasDiploma", e.target.checked)}
+                      className="rounded accent-accent"
+                    />
+                    <span>Has Diploma</span>
+                  </label>
+                </div>
+                {formData.academicProfile.hasDiploma && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                        Diploma % / CGPA
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.academicProfile.diplomaPercentage || ""}
+                        onChange={(e) => handleInputChange("academicProfile", "diplomaPercentage", e.target.value)}
+                        placeholder="e.g. 84.5%"
+                        className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                        Diploma Board / Council
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.academicProfile.diplomaBoard || ""}
+                        onChange={(e) => handleInputChange("academicProfile", "diplomaBoard", e.target.value)}
+                        placeholder="e.g. WBSCTE / MSBTE / DTE"
+                        className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
+                        Diploma College / Institute
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.academicProfile.diplomaCollege || ""}
+                        onChange={(e) => handleInputChange("academicProfile", "diplomaCollege", e.target.value)}
+                        placeholder="e.g. Government Polytechnic"
+                        className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Department & Backlogs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="text-[11px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
-                    12th Board %
+                    Department / Branch
                   </label>
                   <input
                     type="text"
-                    value={formData.academicProfile.twelfthPercentage}
-                    onChange={(e) => handleInputChange("academicProfile", "twelfthPercentage", e.target.value)}
-                    placeholder="e.g. 91.8%"
+                    value={formData.academicProfile.branch}
+                    onChange={(e) => handleInputChange("academicProfile", "branch", e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
                   />
                 </div>
@@ -739,18 +869,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                     <option value="2+">2+</option>
                   </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-ink-muted block mb-1">
-                  Department / Branch
-                </label>
-                <input
-                  type="text"
-                  value={formData.academicProfile.branch}
-                  onChange={(e) => handleInputChange("academicProfile", "branch", e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-canvas border border-border text-xs text-ink focus:outline-none focus:border-accent"
-                />
               </div>
             </div>
           )}
