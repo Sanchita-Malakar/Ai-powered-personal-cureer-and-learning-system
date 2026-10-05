@@ -131,6 +131,8 @@ export function useStudentProfile() {
                 }
               } catch (e) {}
 
+              const storedAcademic = (dbProfile.university_details as any)?.academicProfile || {};
+
               const merged: CompleteStudentProfile = {
                 ...SAMPLE_ONBOARDED_STUDENT,
                 personalInfo: {
@@ -153,16 +155,31 @@ export function useStudentProfile() {
                 },
                 academicProfile: {
                   ...SAMPLE_ONBOARDED_STUDENT.academicProfile,
-                  branch: dbProfile.department_branch || "Computer Science & Engineering",
-                  semester: dbProfile.current_semester || "Semester 7",
-                  cgpa: dbProfile.cgpa !== null && dbProfile.cgpa !== undefined ? String(dbProfile.cgpa) : "",
-                  gradingScale: dbProfile.grading_scale || "10.0",
-                  tenthPercentage: dbProfile.tenth_percentage || "",
-                  twelfthPercentage: dbProfile.twelfth_percentage || "",
-                  activeBacklogs: dbProfile.active_backlogs || "0",
+                  branch: dbProfile.department_branch || storedAcademic.branch || "Computer Science & Engineering",
+                  semester: dbProfile.current_semester || storedAcademic.semester || "Semester 7",
+                  cgpa: dbProfile.cgpa !== null && dbProfile.cgpa !== undefined ? String(dbProfile.cgpa) : storedAcademic.cgpa || "",
+                  gradingScale: dbProfile.grading_scale || storedAcademic.gradingScale || "10.0",
+                  tenthPercentage: dbProfile.tenth_percentage || storedAcademic.tenthPercentage || "",
+                  tenthBoard: storedAcademic.tenthBoard || "",
+                  tenthSchool: storedAcademic.tenthSchool || "",
+                  tenthPassingYear: storedAcademic.tenthPassingYear || "",
+                  twelfthPercentage: dbProfile.twelfth_percentage || storedAcademic.twelfthPercentage || "",
+                  twelfthBoard: storedAcademic.twelfthBoard || "",
+                  twelfthSchool: storedAcademic.twelfthSchool || "",
+                  twelfthStream: storedAcademic.twelfthStream || "",
+                  twelfthPassingYear: storedAcademic.twelfthPassingYear || "",
+                  hasDiploma: storedAcademic.hasDiploma ?? Boolean(storedAcademic.diplomaPercentage),
+                  diplomaPercentage: storedAcademic.diplomaPercentage || "",
+                  diplomaBoard: storedAcademic.diplomaBoard || "",
+                  diplomaCollege: storedAcademic.diplomaCollege || "",
+                  diplomaBranch: storedAcademic.diplomaBranch || "",
+                  diplomaPassingYear: storedAcademic.diplomaPassingYear || "",
+                  activeBacklogs: dbProfile.active_backlogs || storedAcademic.activeBacklogs || "0",
                   subjects:
                     Array.isArray(dbProfile.coursework_subjects) && dbProfile.coursework_subjects.length > 0
                       ? dbProfile.coursework_subjects
+                      : Array.isArray(storedAcademic.subjects) && storedAcademic.subjects.length > 0
+                      ? storedAcademic.subjects
                       : SAMPLE_ONBOARDED_STUDENT.academicProfile.subjects,
                 },
                 projects: fetchedProjects,
@@ -318,7 +335,32 @@ export function useStudentProfile() {
               location_verified: Boolean(personal.cityId),
               university_id: personal.universityId || null,
               institution_name: personal.college || null,
-              university_details: personal.universityDetails || {},
+              university_details: {
+                ...(personal.universityDetails || {}),
+                academicProfile: {
+                  branch: academic.branch || null,
+                  semester: academic.semester || null,
+                  cgpa: academic.cgpa || null,
+                  gradingScale: academic.gradingScale || "10.0",
+                  tenthPercentage: academic.tenthPercentage || null,
+                  tenthBoard: academic.tenthBoard || null,
+                  tenthSchool: academic.tenthSchool || null,
+                  tenthPassingYear: academic.tenthPassingYear || null,
+                  twelfthPercentage: academic.twelfthPercentage || null,
+                  twelfthBoard: academic.twelfthBoard || null,
+                  twelfthSchool: academic.twelfthSchool || null,
+                  twelfthStream: academic.twelfthStream || null,
+                  twelfthPassingYear: academic.twelfthPassingYear || null,
+                  hasDiploma: Boolean(academic.hasDiploma || academic.diplomaPercentage),
+                  diplomaPercentage: academic.diplomaPercentage || null,
+                  diplomaBoard: academic.diplomaBoard || null,
+                  diplomaCollege: academic.diplomaCollege || null,
+                  diplomaBranch: academic.diplomaBranch || null,
+                  diplomaPassingYear: academic.diplomaPassingYear || null,
+                  activeBacklogs: academic.activeBacklogs || "0",
+                  subjects: academic.subjects || [],
+                },
+              },
               institution_verified: Boolean(personal.universityId),
               degree: personal.degree || null,
               graduation_year: personal.graduationYear || null,
@@ -448,10 +490,13 @@ export function useStudentProfile() {
           personalInfo: { ...prev.personalInfo, ...updates },
         };
         persistLocal(next);
+        saveToStorageAndSupabase(next, false).catch((err) =>
+          console.warn("Auto-sync personal info to database warning:", err)
+        );
         return next;
       });
     },
-    [persistLocal]
+    [persistLocal, saveToStorageAndSupabase]
   );
 
   const updateAcademicProfile = useCallback(
@@ -462,10 +507,13 @@ export function useStudentProfile() {
           academicProfile: { ...prev.academicProfile, ...updates },
         };
         persistLocal(next);
+        saveToStorageAndSupabase(next, false).catch((err) =>
+          console.warn("Auto-sync academic profile to database warning:", err)
+        );
         return next;
       });
     },
-    [persistLocal]
+    [persistLocal, saveToStorageAndSupabase]
   );
 
   const updateCareerPreferences = useCallback(

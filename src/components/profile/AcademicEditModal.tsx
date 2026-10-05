@@ -91,9 +91,9 @@ export const AcademicEditModal: React.FC<AcademicEditModalProps> = ({
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-ink">Manual Academic Details Editor</h3>
+              <h3 className="text-lg font-bold text-ink">Academic Details & Coursework Editor</h3>
               <p className="text-xs text-ink-muted">
-                Review or adjust information extracted from your scorecards.
+                Manually enter or adjust your university degree, CGPA, school board marks, diploma credentials, and coursework subjects. Saved directly to the database.
               </p>
             </div>
           </div>
@@ -500,7 +500,7 @@ export const AcademicEditModal: React.FC<AcademicEditModalProps> = ({
               className="px-4 py-2 rounded-xl bg-accent text-white text-xs font-bold hover:bg-accent/90 flex items-center gap-1.5 shadow-sm shadow-accent/25 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>Save Academic Details</span>
+              <span>Save to Database</span>
             </button>
           </div>
         </form>
