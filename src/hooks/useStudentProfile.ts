@@ -173,7 +173,10 @@ export function useStudentProfile() {
                   diplomaBoard: storedAcademic.diplomaBoard || "",
                   diplomaCollege: storedAcademic.diplomaCollege || "",
                   diplomaBranch: storedAcademic.diplomaBranch || "",
-                  diplomaPassingYear: storedAcademic.diplomaPassingYear || "",
+                  degreeName: storedAcademic.degreeName || dbProfile.degree || SAMPLE_ONBOARDED_STUDENT.academicProfile.degreeName,
+                  collegeName: storedAcademic.collegeName || dbProfile.institution_name || SAMPLE_ONBOARDED_STUDENT.academicProfile.collegeName,
+                  universityName: storedAcademic.universityName || (dbProfile.university_details as any)?.officialName || SAMPLE_ONBOARDED_STUDENT.academicProfile.universityName,
+                  graduationYear: storedAcademic.graduationYear || dbProfile.graduation_year || SAMPLE_ONBOARDED_STUDENT.academicProfile.graduationYear,
                   activeBacklogs: dbProfile.active_backlogs || storedAcademic.activeBacklogs || "0",
                   subjects:
                     Array.isArray(dbProfile.coursework_subjects) && dbProfile.coursework_subjects.length > 0
@@ -334,7 +337,7 @@ export function useStudentProfile() {
               city_details: personal.cityDetails || {},
               location_verified: Boolean(personal.cityId),
               university_id: personal.universityId || null,
-              institution_name: personal.college || null,
+              institution_name: academic.collegeName || personal.college || null,
               university_details: {
                 ...(personal.universityDetails || {}),
                 academicProfile: {
@@ -357,13 +360,17 @@ export function useStudentProfile() {
                   diplomaCollege: academic.diplomaCollege || null,
                   diplomaBranch: academic.diplomaBranch || null,
                   diplomaPassingYear: academic.diplomaPassingYear || null,
+                  degreeName: academic.degreeName || personal.degree || null,
+                  collegeName: academic.collegeName || personal.college || null,
+                  universityName: academic.universityName || (personal.universityDetails as any)?.officialName || null,
+                  graduationYear: academic.graduationYear || personal.graduationYear || null,
                   activeBacklogs: academic.activeBacklogs || "0",
                   subjects: academic.subjects || [],
                 },
               },
               institution_verified: Boolean(personal.universityId),
-              degree: personal.degree || null,
-              graduation_year: personal.graduationYear || null,
+              degree: academic.degreeName || personal.degree || null,
+              graduation_year: academic.graduationYear || personal.graduationYear || null,
               github_url: personal.githubUrl || null,
               linkedin_url: personal.linkedInUrl || null,
               portfolio_url: personal.portfolioUrl || null,
@@ -502,8 +509,14 @@ export function useStudentProfile() {
   const updateAcademicProfile = useCallback(
     (updates: Partial<AcademicProfile>) => {
       setProfile((prev) => {
+        const personalUpdates: Partial<PersonalInfo> = {};
+        if (updates.degreeName) personalUpdates.degree = updates.degreeName;
+        if (updates.collegeName) personalUpdates.college = updates.collegeName;
+        if (updates.graduationYear) personalUpdates.graduationYear = updates.graduationYear;
+
         const next = {
           ...prev,
+          personalInfo: { ...prev.personalInfo, ...personalUpdates },
           academicProfile: { ...prev.academicProfile, ...updates },
         };
         persistLocal(next);

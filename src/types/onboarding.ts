@@ -98,6 +98,7 @@ export interface AcademicProfile {
   diplomaPassingYear?: string;
   degreeName?: string;
   collegeName?: string;
+  universityName?: string;
   graduationYear?: string;
   activeBacklogs: "0" | "1" | "2+";
   subjects: SubjectPerformance[];
@@ -378,7 +379,18 @@ export const SAMPLE_ONBOARDED_STUDENT: CompleteStudentProfile = {
     cgpa: "8.85",
     gradingScale: "10.0",
     tenthPercentage: "94.2%",
+    tenthBoard: "Central Board of Secondary Education (CBSE)",
+    tenthSchool: "St. Xavier's Senior Secondary School",
+    tenthPassingYear: "2019",
     twelfthPercentage: "91.8%",
+    twelfthBoard: "Central Board of Secondary Education (CBSE)",
+    twelfthSchool: "Delhi Public School",
+    twelfthStream: "Science (PCM)",
+    twelfthPassingYear: "2021",
+    degreeName: "B.Tech Computer Science & Engineering",
+    collegeName: "National Institute of Technology Karnataka, Surathkal",
+    universityName: "National Institute of Technology",
+    graduationYear: "2025",
     activeBacklogs: "0",
     subjects: [
       { id: "sub-1", name: "Data Structures & Algorithms", gradeOrScore: "A+", proficiency: "Mastered" },

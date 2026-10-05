@@ -157,7 +157,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   const tabs = [
     { id: "all" as const, label: "All Details", icon: LayoutGrid },
     { id: "personal" as const, label: "Personal", icon: User },
-    { id: "education" as const, label: "Education", icon: GraduationCap },
+    { id: "education" as const, label: "Academic Credentials", icon: GraduationCap },
     { id: "skills" as const, label: "Skills", icon: Code2 },
     { id: "projects" as const, label: "Projects", icon: FolderGit2 },
     { id: "certifications" as const, label: "Certifications", icon: Award },

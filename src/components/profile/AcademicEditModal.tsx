@@ -91,9 +91,9 @@ export const AcademicEditModal: React.FC<AcademicEditModalProps> = ({
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-ink">Academic Details & Coursework Editor</h3>
+              <h3 className="text-lg font-bold text-ink">Give Your Academic Credentials</h3>
               <p className="text-xs text-ink-muted">
-                Manually enter or adjust your university degree, CGPA, school board marks, diploma credentials, and coursework subjects. Saved directly to the database.
+                Enter all your essential academic records from 10th school board to university semester, degree, and coursework. Saved directly to the database.
               </p>
             </div>
           </div>
